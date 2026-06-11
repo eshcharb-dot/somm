@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#160b11">
+<title>Somm — your pocket sommelier</title>
+<meta name="description" content="Somm — an AI sommelier that learns your palate. What to drink tonight, what to buy, what to order.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Karla:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍷</text></svg>">
+</head>
+<body>
+
+<!-- ====================== ONBOARDING ====================== -->
+<div id="screen-onboarding" hidden>
+  <div id="quiz" class="container"></div>
+</div>
+
+<!-- ====================== MAIN APP ====================== -->
+<div id="screen-main" hidden>
+  <main class="container">
+
+    <!-- TONIGHT -->
+    <section class="tab" id="tab-tonight">
+      <header class="tab-head">
+        <h1 class="logo">Somm<span class="accent">.</span></h1>
+      </header>
+      <h2 id="tonight-greet" class="greet"></h2>
+      <form id="tonight-form" class="food-form">
+        <input id="tonight-food" class="input" type="text" placeholder="What are you eating? e.g. grilled salmon" autocomplete="off">
+        <button class="btn btn-primary" type="submit">Pair it</button>
+      </form>
+      <div class="quick-row">
+        <button class="btn btn-outline" id="btn-surprise">Surprise me</button>
+        <button class="btn btn-outline" id="btn-store-picks">Shopping list</button>
+      </div>
+      <div id="tonight-results"></div>
+    </section>
+
+    <!-- SCAN -->
+    <section class="tab" id="tab-scan" hidden>
+      <header class="tab-head"><h1 class="logo">Scan<span class="accent">.</span></h1></header>
+
+      <div id="scan-ready">
+        <p class="greet">Point me at anything wine.</p>
+        <div class="scan-grid">
+          <button class="scan-tile" onclick="scanWith('bottle')">
+            <span class="scan-ico">🍾</span><strong>A bottle</strong><span>Is this one for me?</span>
+          </button>
+          <button class="scan-tile" onclick="scanWith('shelf')">
+            <span class="scan-ico">🛒</span><strong>Store shelf</strong><span>What should I grab?</span>
+          </button>
+          <button class="scan-tile" onclick="scanWith('list')">
+            <span class="scan-ico">📜</span><strong>Wine list</strong><span>What do I order?</span>
+          </button>
+          <button class="scan-tile" onclick="scanWith('menu')">
+            <span class="scan-ico">🍽️</span><strong>Food menu</strong><span>Pair my dinner</span>
+          </button>
+        </div>
+        <p class="muted small center">Photos are analyzed by Claude and never stored anywhere but this device.</p>
+      </div>
+
+      <div id="scan-nokey" hidden>
+        <p class="greet">Scanning needs Vera's eyes.</p>
+        <p class="muted">Add your Claude API key in <strong>You → Settings</strong> to unlock bottle, shelf and menu photo analysis. Meanwhile — the offline cheat sheet:</p>
+        <button class="btn btn-primary btn-block" onclick="switchTab('you')">Go to Settings</button>
+        <div id="scan-cheatsheet" class="cheatsheet"></div>
+      </div>
+
+      <input type="file" id="scan-input" accept="image/*" capture="environment" hidden>
+    </section>
+
+    <!-- VERA -->
+    <section class="tab" id="tab-vera" hidden>
+      <header class="tab-head chat-head">
+        <h1 class="logo">Vera<span class="accent">.</span></h1>
+        <div class="mode-chips">
+          <button class="mode-chip" data-mode="tonight">Home</button>
+          <button class="mode-chip" data-mode="store">Store</button>
+          <button class="mode-chip" data-mode="restaurant">Restaurant</button>
+          <button class="mode-chip" data-mode="chat">Anything</button>
+        </div>
+      </header>
+      <div id="chat-scroll"></div>
+      <form id="chat-form" class="chat-form">
+        <input id="chat-input" class="input" type="text" placeholder="Ask Vera anything…" autocomplete="off">
+        <button class="btn btn-primary" type="submit" aria-label="Send">↑</button>
+      </form>
+    </section>
+
+    <!-- YOU -->
+    <section class="tab" id="tab-you" hidden>
+      <header class="tab-head"><h1 class="logo">You<span class="accent">.</span></h1></header>
+      <div id="you-content"></div>
+    </section>
+
+  </main>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="tonight">
+      <svg viewBox="0 0 24 24"><path d="M12 3l8 6v11a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1V9z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+      <span>Tonight</span>
+    </button>
+    <button class="nav-btn" data-tab="scan">
+      <svg viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+      <span>Scan</span>
+    </button>
+    <button class="nav-btn" data-tab="vera">
+      <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H4l2.3-2.7A8 8 0 1 1 21 12z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+      <span>Vera</span>
+    </button>
+    <button class="nav-btn" data-tab="you">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5 20a7 7 0 0 1 14 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <span>You</span>
+    </button>
+  </nav>
+</div>
+
+<div id="toast"></div>
+
+<script src="js/data.js"></script>
+<script src="js/profile.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

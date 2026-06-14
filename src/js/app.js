@@ -76,6 +76,30 @@ function bindGlobal() {
   $("#tonight-form").addEventListener("submit", onTonightSubmit);
   $("#btn-surprise").addEventListener("click", () => runTonight("surprise me", true));
   $("#btn-store-picks").addEventListener("click", runStorePicks);
+  bindKeyboardHandler();
+}
+
+function bindKeyboardHandler() {
+  // On Android, the software keyboard shrinks visualViewport but not window.
+  // We use this to push the chat form above the keyboard.
+  if (!window.visualViewport) return;
+  const chatForm = $("#chat-form");
+  const chatScroll = $("#chat-scroll");
+
+  function onViewportResize() {
+    if (state.tab !== "vera") return;
+    const keyboardH = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
+    if (keyboardH > 100) {
+      // Keyboard is open — lift form above it
+      chatForm.style.paddingBottom = keyboardH + "px";
+      setTimeout(() => scrollChat(), 50);
+    } else {
+      chatForm.style.paddingBottom = "";
+    }
+  }
+
+  window.visualViewport.addEventListener("resize", onViewportResize);
+  window.visualViewport.addEventListener("scroll", onViewportResize);
 }
 
 // ============================== ONBOARDING ==============================

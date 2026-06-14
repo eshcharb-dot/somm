@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Somm">
 <meta name="theme-color" content="#160b11">
 <title>Somm — your pocket sommelier</title>
 <meta name="description" content="Somm — an AI sommelier that learns your palate. What to drink tonight, what to buy, what to order.">
@@ -76,20 +81,22 @@
 
     <!-- VERA -->
     <section class="tab" id="tab-vera" hidden>
-      <header class="tab-head chat-head">
-        <h1 class="logo">Vera<span class="accent">.</span></h1>
-        <div class="mode-chips">
-          <button class="mode-chip" data-mode="tonight">Home</button>
-          <button class="mode-chip" data-mode="store">Store</button>
-          <button class="mode-chip" data-mode="restaurant">Restaurant</button>
-          <button class="mode-chip" data-mode="chat">Anything</button>
-        </div>
-      </header>
-      <div id="chat-scroll"></div>
-      <form id="chat-form" class="chat-form">
-        <input id="chat-input" class="input" type="text" placeholder="Ask Vera anything…" autocomplete="off">
-        <button class="btn btn-primary" type="submit" aria-label="Send">↑</button>
-      </form>
+      <div class="vera-tab-inner">
+        <header class="tab-head chat-head">
+          <h1 class="logo">Vera<span class="accent">.</span></h1>
+          <div class="mode-chips">
+            <button class="mode-chip" data-mode="tonight">Home</button>
+            <button class="mode-chip" data-mode="store">Store</button>
+            <button class="mode-chip" data-mode="restaurant">Restaurant</button>
+            <button class="mode-chip" data-mode="chat">Anything</button>
+          </div>
+        </header>
+        <div id="chat-scroll"></div>
+        <form id="chat-form" class="chat-form">
+          <input id="chat-input" class="input" type="text" placeholder="Ask Vera anything…" autocomplete="off" inputmode="text">
+          <button class="btn btn-primary" type="submit" aria-label="Send">↑</button>
+        </form>
+      </div>
     </section>
 
     <!-- YOU -->

@@ -126,4 +126,150 @@ function prepareImage(file, maxEdge) {
   });
 }
 
-const SommAI = { buildSystemPrompt, callAI, parseWineCards, prepareImage };
+// Per-mode scan system prompts — return structured <scan-result> JSON
+const SCAN_PROMPTS = {
+  bottle: `You are Vera, AI sommelier. Analyze this SINGLE BOTTLE photo.
+
+Return ONLY a <scan-result> JSON block — no prose before or after:
+
+<scan-result>
+{
+  "mode": "bottle",
+  "summary": "2-3 sentences from Vera — warm, honest, specific verdict tied to THIS user's profile",
+  "picks": [
+    {
+      "rank": 1,
+      "name": "Full wine name",
+      "producer": "Producer or null",
+      "region": "Region, Country",
+      "grape": "Grape variety",
+      "type": "red|white|rose|sparkling|orange|dessert",
+      "vintage": "2019 or null",
+      "label_price": "€28 exactly as printed, or null if not visible",
+      "price_verdict": "Great value|Fair price|Pricey|Overpriced",
+      "shelf_position": null,
+      "match_reason": "One specific sentence linking this wine to the user's actual palate dimensions (body/acid/tannin/etc.)",
+      "match": 85,
+      "attrs": {"body":0.7,"sweet":0.1,"acid":0.6,"tannin":0.7,"fruit":0.6,"oak":0.5},
+      "pairing": "Quick food pairing idea or null"
+    }
+  ]
+}
+</scan-result>`,
+
+  shelf: `You are Vera, AI sommelier. Analyze this WINE SHELF photo and select the best picks.
+
+Return ONLY a <scan-result> JSON block — no prose before or after:
+
+<scan-result>
+{
+  "mode": "shelf",
+  "summary": "1-2 sentence intro from Vera describing what she sees and her overall take",
+  "picks": [
+    {
+      "rank": 1,
+      "name": "Full wine name",
+      "producer": "Producer or null",
+      "region": "Region, Country",
+      "grape": "Grape variety",
+      "type": "red|white|rose|sparkling|orange|dessert",
+      "vintage": "Year or null",
+      "label_price": "€28 as shown on shelf tag, or null",
+      "price_verdict": "Great value|Fair price|Pricey|Overpriced",
+      "shelf_position": "REQUIRED — precise visual wayfinding: which shelf (top/middle/bottom), left/center/right, what's next to it, label color and key design detail — enough to grab it in 5 seconds",
+      "match_reason": "One specific sentence tying this to THIS user's profile (body/tannin/acid/sweetness/oak)",
+      "match": 85,
+      "attrs": {"body":0.7,"sweet":0.1,"acid":0.6,"tannin":0.7,"fruit":0.6,"oak":0.5},
+      "pairing": "Quick food pairing or null"
+    }
+  ]
+}
+</scan-result>
+
+Pick 3–5 bottles. Only include bottles you can CONFIDENTLY identify. Skip blurry or unreadable labels.`,
+
+  list: `You are Vera, AI sommelier. Analyze this WINE LIST and pick the best value options.
+
+Return ONLY a <scan-result> JSON block — no prose before or after:
+
+<scan-result>
+{
+  "mode": "list",
+  "summary": "1-2 sentences from Vera — note if the list is smart value or overpriced overall",
+  "picks": [
+    {
+      "rank": 1,
+      "name": "Full wine name as shown on list",
+      "producer": "Producer or null",
+      "region": "Region, Country",
+      "grape": "Grape variety",
+      "type": "red|white|rose|sparkling|orange|dessert",
+      "vintage": "Year or null",
+      "label_price": "€XX exactly as printed on the list",
+      "price_verdict": "Great value|Fair price|Pricey|Overpriced — compare to typical retail markup",
+      "shelf_position": null,
+      "match_reason": "Why this fits the user AND is the smart order here",
+      "match": 85,
+      "attrs": {"body":0.7,"sweet":0.1,"acid":0.6,"tannin":0.7,"fruit":0.6,"oak":0.5},
+      "pairing": "Best dish to order with it, or null"
+    }
+  ]
+}
+</scan-result>
+
+Pick 2–3 wines. Flag any obvious value traps.`,
+
+  menu: `You are Vera, AI sommelier. Analyze this FOOD MENU and suggest wine styles to pair with the dishes.
+
+Return ONLY a <scan-result> JSON block — no prose before or after:
+
+<scan-result>
+{
+  "mode": "menu",
+  "summary": "1-2 sentences on the cuisine style and the pairing strategy you'd use",
+  "picks": [
+    {
+      "rank": 1,
+      "name": "Wine style or variety (not a specific bottle — e.g. 'Dry Riesling')",
+      "producer": null,
+      "region": "Suggested region or null",
+      "grape": "Grape variety",
+      "type": "red|white|rose|sparkling|orange|dessert",
+      "vintage": null,
+      "label_price": null,
+      "price_verdict": null,
+      "shelf_position": null,
+      "match_reason": "Which specific dishes from the menu this pairs with and why",
+      "match": 88,
+      "attrs": {"body":0.6,"sweet":0.1,"acid":0.7,"tannin":0.4,"fruit":0.6,"oak":0.3},
+      "pairing": "Specific dish names from the menu"
+    }
+  ]
+}
+</scan-result>
+
+Give 2–3 style recommendations. Reference actual dishes you can see on the menu.`,
+};
+
+function buildScanSystemPrompt(profile, mode, currency) {
+  const base = SCAN_PROMPTS[mode] || SCAN_PROMPTS.bottle;
+  return [
+    base,
+    `Currency for prices: ${currency || "€"}`,
+    "=== USER'S TASTE PROFILE (match_reason MUST reference specific profile data — body, acid, tannin, sweetness, etc.) ===",
+    SommProfile.profileForPrompt(profile),
+  ].join("\n\n");
+}
+
+function parseScanResult(text) {
+  const m = text.match(/<scan-result>([\s\S]*?)<\/scan-result>/);
+  if (!m) return null;
+  try {
+    return JSON.parse(m[1].trim());
+  } catch (e) {
+    console.warn("Failed to parse scan-result JSON", e);
+    return null;
+  }
+}
+
+const SommAI = { buildSystemPrompt, buildScanSystemPrompt, parseScanResult, callAI, parseWineCards, prepareImage };

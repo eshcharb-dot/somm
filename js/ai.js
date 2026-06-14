@@ -4,7 +4,7 @@
 
 const BACKEND_URL = window.location.hostname === "localhost"
   ? "http://localhost:3000"
-  : "https://somm-backend.vercel.app"; // Update to your deployed backend URL
+  : "https://backend-nu-ashen-76.vercel.app";
 
 const VERA_SYSTEM_BASE = `You are Vera, the in-app sommelier of "Somm" — a personal AI wine companion.
 

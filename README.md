@@ -13,13 +13,16 @@
   - **Tonight** — what to open at home + food pairing (works fully offline via the local engine)
   - **Store** — snap a shelf or bottle photo → best buys for your palate and budget
   - **Restaurant** — snap the wine list or menu → best value picks for your meal
-- **Photo analysis** — bottle, shelf, wine list, or food menu, powered by Claude vision
+- **Photo analysis** — bottle, shelf, wine list, or food menu. Uses **Groq** (free tier) by default, or **Claude** (premium) if you bring your key.
 
 ## Setup (2 minutes)
 
 1. Open the app, do the quiz.
 2. The Tonight tab works immediately — no key needed.
-3. For Vera chat + photo scanning: get a Claude API key at [console.anthropic.com](https://console.anthropic.com) → paste it in **You → Settings**. The key lives only in your browser's localStorage; calls go directly from your device to Anthropic.
+3. For Vera chat + photo scanning:
+   - **Free**: Get a Groq API key at [console.groq.com](https://console.groq.com) (no credit card, 5,000 requests/month) → paste in **You → Settings**
+   - **Premium**: Get a Claude key at [console.anthropic.com](https://console.anthropic.com) → paste in **You → Settings** (for best wine analysis quality)
+   - Keys are stored only in your browser's localStorage; calls go directly from your device to the AI provider
 
 ## Architecture
 

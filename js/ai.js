@@ -1,6 +1,10 @@
-// Somm — AI layer. Supports Claude (premium) or Groq (free tier).
-// API keys stored only in localStorage. Default: Groq (free), fallback to local-only mode.
+// Somm — AI layer. Calls backend proxy for Claude/Groq access (no client-side keys).
+// Backend at BACKEND_URL handles API calls securely.
 "use strict";
+
+const BACKEND_URL = window.location.hostname === "localhost"
+  ? "http://localhost:3000"
+  : "https://somm-backend.vercel.app"; // Update to your deployed backend URL
 
 const VERA_SYSTEM_BASE = `You are Vera, the in-app sommelier of "Somm" — a personal AI wine companion.
 
@@ -50,80 +54,36 @@ function buildSystemPrompt(profile, mode, currency) {
   ].join("\n\n");
 }
 
-// Route to Claude or Groq based on settings. Messages shape matches both APIs.
-async function callAI({ messages, system, apiKey, provider, model, maxTokens }) {
-  if (provider === "claude") {
-    return callClaude({ messages, system, apiKey, model: model || "claude-opus-4-8", maxTokens });
+// Call backend AI proxy (no client-side keys needed)
+async function callAI({ messages, system, provider, model, maxTokens }) {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/ai`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        provider: provider || "claude",
+        messages,
+        system,
+        model,
+        maxTokens: maxTokens || 1500,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      if (res.status === 429) throw new Error("Rate limited — wait a moment and try again.");
+      if (res.status === 503) throw new Error("AI service unavailable — try again later.");
+      throw new Error(err.error || `Backend error ${res.status}`);
+    }
+
+    const data = await res.json();
+    return { text: data.text, usage: data.usage, stopReason: data.stopReason };
+  } catch (err) {
+    if (err.message.includes("fetch")) {
+      throw new Error("Can't reach AI backend. Check your internet or backend URL.");
+    }
+    throw err;
   }
-  if (provider === "groq") {
-    return callGroq({ messages, system, apiKey, model: model || "mixtral-8x7b-32768", maxTokens });
-  }
-  throw new Error("No AI provider configured. Add a key in Settings (Claude) or use Groq free tier.");
-}
-
-async function callClaude({ messages, system, apiKey, model, maxTokens }) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: maxTokens || 1500,
-      system,
-      messages,
-    }),
-  });
-
-  if (!res.ok) {
-    let detail = "";
-    try { detail = (await res.json()).error?.message || ""; } catch (e) { /* ignore */ }
-    const friendly = {
-      401: "That Claude API key doesn't look right — check it in Settings.",
-      403: "Your Claude key doesn't have permission for this model.",
-      429: "Claude rate limited — try again in a moment.",
-      529: "Claude overloaded — try again soon.",
-    }[res.status];
-    throw new Error(friendly || `Claude error ${res.status}${detail ? ": " + detail : ""}`);
-  }
-
-  const data = await res.json();
-  const text = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
-  return { text, usage: data.usage, stopReason: data.stop_reason };
-}
-
-async function callGroq({ messages, system, apiKey, model, maxTokens }) {
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "authorization": "Bearer " + apiKey,
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: maxTokens || 1500,
-      system_prompt: system,
-      messages,
-      temperature: 1,
-    }),
-  });
-
-  if (!res.ok) {
-    let detail = "";
-    try { detail = (await res.json()).error?.message || ""; } catch (e) { /* ignore */ }
-    const friendly = {
-      401: "That Groq API key doesn't look right — check it in Settings. Get a free key at console.groq.com.",
-      429: "Groq rate limited (free tier: 30 req/min) — wait a moment and try again.",
-    }[res.status];
-    throw new Error(friendly || `Groq error ${res.status}${detail ? ": " + detail : ""}`);
-  }
-
-  const data = await res.json();
-  const text = data.choices?.[0]?.message?.content || "";
-  return { text, usage: data.usage, stopReason: data.choices?.[0]?.finish_reason };
 }
 
 // Parse <wine>{...}</wine> cards out of Vera's reply.
@@ -166,4 +126,4 @@ function prepareImage(file, maxEdge) {
   });
 }
 
-const SommAI = { buildSystemPrompt, callAI, callClaude, callGroq, parseWineCards, prepareImage };
+const SommAI = { buildSystemPrompt, callAI, parseWineCards, prepareImage };

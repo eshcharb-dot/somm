@@ -1,8 +1,6 @@
-// Somm — AI layer. Direct browser calls to the Claude API.
-// Requires the user's own API key (Settings); stored only in localStorage.
+// Somm — AI layer. Supports Claude (premium) or Groq (free tier).
+// API keys stored only in localStorage. Default: Groq (free), fallback to local-only mode.
 "use strict";
-
-const API_URL = "https://api.anthropic.com/v1/messages";
 
 const VERA_SYSTEM_BASE = `You are Vera, the in-app sommelier of "Somm" — a personal AI wine companion.
 
@@ -52,9 +50,19 @@ function buildSystemPrompt(profile, mode, currency) {
   ].join("\n\n");
 }
 
-// messages: [{role, content}] where content is string or content-block array.
+// Route to Claude or Groq based on settings. Messages shape matches both APIs.
+async function callAI({ messages, system, apiKey, provider, model, maxTokens }) {
+  if (provider === "claude") {
+    return callClaude({ messages, system, apiKey, model: model || "claude-opus-4-8", maxTokens });
+  }
+  if (provider === "groq") {
+    return callGroq({ messages, system, apiKey, model: model || "mixtral-8x7b-32768", maxTokens });
+  }
+  throw new Error("No AI provider configured. Add a key in Settings (Claude) or use Groq free tier.");
+}
+
 async function callClaude({ messages, system, apiKey, model, maxTokens }) {
-  const res = await fetch(API_URL, {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -63,7 +71,7 @@ async function callClaude({ messages, system, apiKey, model, maxTokens }) {
       "anthropic-dangerous-direct-browser-access": "true",
     },
     body: JSON.stringify({
-      model: model || "claude-opus-4-8",
+      model,
       max_tokens: maxTokens || 1500,
       system,
       messages,
@@ -74,17 +82,48 @@ async function callClaude({ messages, system, apiKey, model, maxTokens }) {
     let detail = "";
     try { detail = (await res.json()).error?.message || ""; } catch (e) { /* ignore */ }
     const friendly = {
-      401: "That API key doesn't look right — check it in Settings.",
-      403: "Your API key doesn't have permission for this model.",
-      429: "Rate limited — give it a few seconds and try again.",
-      529: "Claude is overloaded right now — try again in a moment.",
+      401: "That Claude API key doesn't look right — check it in Settings.",
+      403: "Your Claude key doesn't have permission for this model.",
+      429: "Claude rate limited — try again in a moment.",
+      529: "Claude overloaded — try again soon.",
     }[res.status];
-    throw new Error(friendly || `API error ${res.status}${detail ? ": " + detail : ""}`);
+    throw new Error(friendly || `Claude error ${res.status}${detail ? ": " + detail : ""}`);
   }
 
   const data = await res.json();
   const text = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
   return { text, usage: data.usage, stopReason: data.stop_reason };
+}
+
+async function callGroq({ messages, system, apiKey, model, maxTokens }) {
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "authorization": "Bearer " + apiKey,
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: maxTokens || 1500,
+      system_prompt: system,
+      messages,
+      temperature: 1,
+    }),
+  });
+
+  if (!res.ok) {
+    let detail = "";
+    try { detail = (await res.json()).error?.message || ""; } catch (e) { /* ignore */ }
+    const friendly = {
+      401: "That Groq API key doesn't look right — check it in Settings. Get a free key at console.groq.com.",
+      429: "Groq rate limited (free tier: 30 req/min) — wait a moment and try again.",
+    }[res.status];
+    throw new Error(friendly || `Groq error ${res.status}${detail ? ": " + detail : ""}`);
+  }
+
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content || "";
+  return { text, usage: data.usage, stopReason: data.choices?.[0]?.finish_reason };
 }
 
 // Parse <wine>{...}</wine> cards out of Vera's reply.
@@ -127,4 +166,4 @@ function prepareImage(file, maxEdge) {
   });
 }
 
-const SommAI = { buildSystemPrompt, callClaude, parseWineCards, prepareImage };
+const SommAI = { buildSystemPrompt, callAI, callClaude, callGroq, parseWineCards, prepareImage };

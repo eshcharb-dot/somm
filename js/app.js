@@ -307,7 +307,7 @@ function runStorePicks() {
 
 // ============================== SCAN ==============================
 function renderScanHint() {
-  const hasKey = !!state.settings.apiKey;
+  const hasKey = !!state.settings.apiKey || !!state.settings.groqKey;
   $("#scan-nokey").hidden = hasKey;
   $("#scan-ready").hidden = !hasKey;
   if (!hasKey) {
@@ -357,10 +357,11 @@ function renderChat() {
   if (!state.chat.length) {
     const hello = document.createElement("div");
     hello.className = "msg assistant";
+    const hasKey = !!state.settings.apiKey || !!state.settings.groqKey;
     hello.innerHTML = `<div class="vera-avatar sm">V</div><div class="bubble">${
-      state.settings.apiKey
+      hasKey
         ? `Hey${state.profile.name ? " " + esc(state.profile.name) : ""}. Ask me anything — what to open, what to buy, what to order. Or snap a photo from the Scan tab.`
-        : `I can chat properly once you add a Claude API key in <strong>You → Settings</strong>. Until then, the Tonight tab works offline with your taste profile.`
+        : `I need an API key to chat. Get a <strong>free</strong> Groq key at console.groq.com (no CC, 5K req/month), or bring your own Claude key. Add it in <strong>You → Settings</strong>. The Tonight tab works offline while you're deciding.`
     }</div>`;
     wrap.appendChild(hello);
   }
@@ -449,10 +450,14 @@ async function sendToVera(text, image) {
     });
 
     const system = SommAI.buildSystemPrompt(state.profile, state.chatMode, state.settings.currency);
-    const res = await SommAI.callClaude({
+    const provider = state.settings.provider || (state.settings.apiKey ? "claude" : "groq");
+    const apiKey = state.settings.apiKey || state.settings.groqKey || "";
+    if (!apiKey) throw new Error("No AI key configured. Add a Groq key (free) or Claude key in Settings.");
+    const res = await SommAI.callAI({
       messages: apiMessages,
       system,
-      apiKey: state.settings.apiKey,
+      apiKey,
+      provider,
       model: state.settings.model,
       maxTokens: 1500,
     });
@@ -549,21 +554,35 @@ function renderYou() {
     </section>
 
     <section class="panel">
-      <h3>Settings</h3>
-      <label class="field-label">Claude API key <span class="muted">(stored only on this device)</span></label>
-      <input type="password" id="set-key" class="input" placeholder="sk-ant-..." value="${esc(state.settings.apiKey)}" autocomplete="off">
-      <label class="field-label">Model</label>
-      <select id="set-model" class="input">
-        <option value="claude-opus-4-8" ${state.settings.model === "claude-opus-4-8" ? "selected" : ""}>Opus 4.8 — best (default)</option>
-        <option value="claude-sonnet-4-6" ${state.settings.model === "claude-sonnet-4-6" ? "selected" : ""}>Sonnet 4.6 — faster, cheaper</option>
-        <option value="claude-haiku-4-5" ${state.settings.model === "claude-haiku-4-5" ? "selected" : ""}>Haiku 4.5 — cheapest</option>
+      <h3>AI Provider</h3>
+      <label class="field-label">Choose free or premium</label>
+      <select id="set-provider" class="input">
+        <option value="groq" ${state.settings.provider === "groq" ? "selected" : ""}>Groq — Free (5K req/month, no CC)</option>
+        <option value="claude" ${state.settings.provider === "claude" ? "selected" : ""}>Claude — Premium (paid)</option>
       </select>
+
+      <div id="groq-section">
+        <label class="field-label">Groq API key <span class="muted">(free tier, stored locally only)</span></label>
+        <input type="password" id="set-groq" class="input" placeholder="gsk_..." value="${esc(state.settings.groqKey)}" autocomplete="off">
+        <p class="muted small" style="margin-top: 6px;">Get free key at <a href="https://console.groq.com" target="_blank" style="color: var(--gold-soft)">console.groq.com</a> (no credit card). Mixtral 8x7b is excellent for reasoning.</p>
+      </div>
+
+      <div id="claude-section" style="display:none;">
+        <label class="field-label">Claude API key <span class="muted">(stored locally only)</span></label>
+        <input type="password" id="set-claude" class="input" placeholder="sk-ant-..." value="${esc(state.settings.apiKey)}" autocomplete="off">
+        <label class="field-label">Model</label>
+        <select id="set-model" class="input">
+          <option value="claude-opus-4-8" ${state.settings.model === "claude-opus-4-8" ? "selected" : ""}>Opus 4.8 — best</option>
+          <option value="claude-sonnet-4-6" ${state.settings.model === "claude-sonnet-4-6" ? "selected" : ""}>Sonnet 4.6 — faster</option>
+        </select>
+        <p class="muted small" style="margin-top: 6px;">Get key at <a href="https://console.anthropic.com" target="_blank" style="color: var(--gold-soft)">console.anthropic.com</a>.</p>
+      </div>
+
       <label class="field-label">Currency</label>
       <select id="set-currency" class="input">
         ${["€", "$", "£", "₪"].map((c) => `<option ${state.settings.currency === c ? "selected" : ""}>${c}</option>`).join("")}
       </select>
       <button class="btn btn-primary" id="set-save">Save settings</button>
-      <p class="muted small">Get a key at console.anthropic.com → API keys. Calls go directly from your device to Anthropic — nothing passes through any other server.</p>
     </section>
 
     <section class="panel danger-zone">
@@ -578,15 +597,27 @@ function renderYou() {
     SommProfile.saveProfile(p);
     toast("Budget saved");
   });
+  $("#set-provider").addEventListener("change", () => {
+    const provider = $("#set-provider").value;
+    $("#groq-section").style.display = provider === "groq" ? "block" : "none";
+    $("#claude-section").style.display = provider === "claude" ? "block" : "none";
+  });
   $("#set-save").addEventListener("click", () => {
-    state.settings.apiKey = $("#set-key").value.trim();
-    state.settings.model = $("#set-model").value;
+    const provider = $("#set-provider").value;
+    state.settings.provider = provider;
+    if (provider === "groq") {
+      state.settings.groqKey = $("#set-groq").value.trim();
+    } else {
+      state.settings.apiKey = $("#set-claude").value.trim();
+      state.settings.model = $("#set-model").value;
+    }
     state.settings.currency = $("#set-currency").value;
     SommProfile.saveSettings(state.settings);
-    toast(state.settings.apiKey ? "Settings saved — Vera is fully online" : "Settings saved");
+    const hasKey = state.settings.groqKey || state.settings.apiKey;
+    toast(hasKey ? "Settings saved — Vera is online" : "Settings saved");
   });
   $("#p-export").addEventListener("click", () => {
-    const blob = new Blob([JSON.stringify({ profile: p, settings: { ...state.settings, apiKey: "" } }, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify({ profile: p, settings: { ...state.settings, apiKey: "", groqKey: "" } }, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "somm-profile.json";

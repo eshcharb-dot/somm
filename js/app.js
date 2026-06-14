@@ -46,15 +46,28 @@ function saveChat() {
 }
 
 // ============================== BOOT ==============================
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   loadChat();
+  await SommAuth.init(onAuthStateChange);
   if (!state.profile.onboarded) {
     showOnboarding();
   } else {
     showMain();
   }
   bindGlobal();
+  bindAuthModal();
 });
+
+async function onAuthStateChange(event, user) {
+  if (event === "SIGNED_IN" && user) {
+    SommDB.saveProfile(state.profile, state.settings);
+    toast("Profile synced to cloud ✓");
+    if (state.tab === "you") renderYou();
+  }
+  if (event === "SIGNED_OUT") {
+    if (state.tab === "you") renderYou();
+  }
+}
 
 function bindGlobal() {
   $$(".nav-btn").forEach((btn) => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
@@ -226,6 +239,9 @@ function wineCardEl(card, context) {
       attrs: card.attrs, price: card.price,
     };
     SommProfile.learnFromRating(state.profile, wine, rating, context);
+    const dbRating = rating === "love" ? "loved" : rating === "ok" ? "fine" : "skip";
+    SommDB.saveRating(wine, dbRating, context);
+    SommDB.saveProfile(state.profile, state.settings);
     $(".wc-actions", el).innerHTML = `<span class="rated">${
       rating === "love" ? "Noted — more like this ♥" : rating === "ok" ? "Noted." : "Got it — steering away."
     } <em>(profile ${SommProfile.confidencePct(state.profile)}%)</em></span>`;
@@ -284,9 +300,8 @@ function runTonight(text, surprise) {
 
   const ask = document.createElement("button");
   ask.className = "btn btn-outline btn-block";
-  ask.textContent = state.settings.apiKey ? "Ask Vera to go deeper →" : "Get the full Vera experience (add API key) →";
+  ask.textContent = "Ask Vera to go deeper →";
   ask.addEventListener("click", () => {
-    if (!state.settings.apiKey) { switchTab("you"); toast("Add your Claude API key under Settings"); return; }
     state.chatMode = "tonight";
     switchTab("vera");
     sendToVera(surprise ? "Surprise me — what should I open tonight?" : `Tonight I'm having: ${text}. What should I open, and why?`);
@@ -307,20 +322,8 @@ function runStorePicks() {
 
 // ============================== SCAN ==============================
 function renderScanHint() {
-  // AI is always available via backend
   $("#scan-nokey").hidden = true;
   $("#scan-ready").hidden = false;
-  if (!hasKey) {
-    const list = $("#scan-cheatsheet");
-    if (!list.childElementCount) {
-      SOMM_DATA.RESTO_CHEATSHEET.forEach((r) => {
-        const li = document.createElement("div");
-        li.className = "cheat-row";
-        li.innerHTML = `<strong>${esc(r.cuisine)}</strong><span>${esc(r.tip)}</span>`;
-        list.appendChild(li);
-      });
-    }
-  }
 }
 
 function scanWith(mode) {
@@ -410,13 +413,9 @@ function onChatSubmit(e) {
 }
 
 async function sendToVera(text, image) {
-  if (!state.settings.apiKey) {
-    switchTab("you");
-    toast("Add your Claude API key under Settings first");
-    return;
-  }
   const userMsg = { role: "user", text, dataUrl: image ? image.dataUrl : null };
   state.chat.push(userMsg);
+  SommDB.saveMessage("user", text, state.chatMode);
   renderChat();
   scrollChat();
 
@@ -454,6 +453,7 @@ async function sendToVera(text, image) {
     });
     const { prose, cards } = SommAI.parseWineCards(res.text);
     state.chat.push({ role: "assistant", text: prose, cards });
+    SommDB.saveMessage("assistant", prose, state.chatMode, cards);
   } catch (err) {
     state.chat.push({ role: "assistant", text: `⚠️ ${err.message}` });
   } finally {
@@ -483,6 +483,7 @@ function renderYou() {
   const p = state.profile;
   const wrap = $("#you-content");
   const conf = SommProfile.confidencePct(p);
+  const user = SommAuth.getUser();
 
   const dimBars = SommProfile.DIM_KEYS.map((k) => `
     <div class="bar-row">
@@ -507,7 +508,21 @@ function renderYou() {
       <span class="j-date">${new Date(h.ts).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
     </div>`).join("");
 
-  wrap.innerHTML = `
+  const authSection = user
+    ? `<div class="user-card">
+        <div class="user-avatar">${esc((user.email || "?")[0].toUpperCase())}</div>
+        <div class="user-info">
+          <div class="user-name">${esc(user.user_metadata?.display_name || p.name || user.email?.split("@")[0] || "Wine lover")}</div>
+          <div class="user-email">${esc(user.email || "")}</div>
+        </div>
+        <button class="btn-ghost" id="you-signout">Sign out</button>
+      </div>`
+    : `<div class="signin-nudge">
+        <p>Sign in to sync your palate across devices and contribute to crowd discovery.</p>
+        <button class="btn btn-primary" id="you-signin">Sign in / Create account</button>
+      </div>`;
+
+  wrap.innerHTML = authSection + `
     <div class="you-head">
       <div class="you-conf-ring" style="--pct:${conf}">
         <span class="you-conf-num">${conf}%</span>
@@ -594,4 +609,73 @@ function renderYou() {
       location.reload();
     }
   });
+
+  if (user) {
+    $("#you-signout").addEventListener("click", async () => {
+      await SommAuth.signOut();
+      toast("Signed out");
+    });
+  } else {
+    $("#you-signin").addEventListener("click", () => showAuthModal());
+  }
+}
+
+// ============================== AUTH MODAL ==============================
+function showAuthModal() { $("#auth-modal").hidden = false; }
+function hideAuthModal() { $("#auth-modal").hidden = true; }
+
+function bindAuthModal() {
+  let mode = "signin";
+
+  function setMode(m) {
+    mode = m;
+    $("#at-signin").classList.toggle("active", m === "signin");
+    $("#at-signup").classList.toggle("active", m === "signup");
+    $("#auth-name-wrap").hidden = m === "signin";
+    $("#auth-submit").textContent = m === "signin" ? "Sign in" : "Create account";
+    const err = $("#auth-error");
+    err.hidden = true;
+    err.textContent = "";
+  }
+
+  $("#at-signin").addEventListener("click", () => setMode("signin"));
+  $("#at-signup").addEventListener("click", () => setMode("signup"));
+  $("#auth-close").addEventListener("click", hideAuthModal);
+  $("#auth-skip").addEventListener("click", hideAuthModal);
+
+  $("#auth-google").addEventListener("click", async () => {
+    try { await SommAuth.signInWithGoogle(); }
+    catch (e) { showAuthError(e.message); }
+  });
+
+  $("#auth-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = $("#auth-email").value.trim();
+    const password = $("#auth-password").value;
+    const name = $("#auth-name").value.trim();
+    const btn = $("#auth-submit");
+    btn.disabled = true;
+    btn.textContent = mode === "signin" ? "Signing in…" : "Creating account…";
+    try {
+      if (mode === "signup") {
+        await SommAuth.signUp(email, password, name);
+        toast("Check your email to confirm your account!");
+        hideAuthModal();
+      } else {
+        await SommAuth.signIn(email, password);
+        hideAuthModal();
+      }
+    } catch (err) {
+      showAuthError(err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = mode === "signin" ? "Sign in" : "Create account";
+    }
+  });
+}
+
+function showAuthError(msg) {
+  const el = $("#auth-error");
+  el.textContent = msg;
+  el.hidden = false;
 }

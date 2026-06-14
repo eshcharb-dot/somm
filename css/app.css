@@ -290,6 +290,67 @@ select.input { appearance: none; }
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* ---------- auth modal ---------- */
+#auth-modal { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; }
+#auth-modal[hidden] { display: none; }
+.auth-overlay {
+  position: absolute; inset: 0;
+  background: rgba(22, 11, 17, .82); backdrop-filter: blur(7px); cursor: pointer;
+}
+.auth-card {
+  position: relative; z-index: 1;
+  width: min(400px, 92vw);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 20px;
+  padding: 28px 24px 20px;
+  animation: rise .22s ease;
+}
+.auth-logo { font-family: var(--font-display); font-style: italic; font-size: 2rem; margin-bottom: 18px; }
+.auth-tab-row {
+  display: flex; background: var(--bg-soft); border-radius: 10px; padding: 3px; gap: 3px; margin-bottom: 18px;
+}
+.auth-tab {
+  flex: 1; font: inherit; font-size: .88rem; font-weight: 600;
+  padding: 8px; border-radius: 8px; border: none; cursor: pointer;
+  background: none; color: var(--muted); transition: all .15s ease;
+}
+.auth-tab.active { background: var(--panel-2); color: var(--cream); border: 1px solid var(--line); }
+.auth-err { color: var(--wine-bright); font-size: .86rem; margin: 8px 0 0; }
+.auth-divider {
+  display: flex; align-items: center; gap: 12px; margin: 14px 0 10px;
+  color: var(--muted); font-size: .8rem;
+}
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.google-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; padding: 12px; font: inherit; font-weight: 600; cursor: pointer;
+  background: var(--panel-2); color: var(--cream); border: 1px solid var(--line); border-radius: 12px;
+  transition: border-color .12s ease;
+}
+.google-btn:hover { border-color: var(--gold); }
+.auth-skip { display: block; width: 100%; text-align: center; margin-top: 4px; }
+
+/* User card shown in You tab when logged in */
+.user-card {
+  background: linear-gradient(135deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 14px 16px; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 14px;
+}
+.user-avatar {
+  flex: 0 0 auto; width: 46px; height: 46px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold), var(--wine));
+  display: grid; place-items: center;
+  font-family: var(--font-display); font-size: 1.25rem; color: #fff; font-style: italic;
+}
+.user-info { flex: 1; min-width: 0; }
+.user-name { font-weight: 600; }
+.user-email { color: var(--muted); font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.signin-nudge {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 16px; margin-bottom: 14px; text-align: center;
+}
+.signin-nudge p { color: var(--cream-dim); margin: 0 0 12px; font-size: .9rem; }
+
 /* ---------- wider screens ---------- */
 @media (min-width: 700px) {
   .container { max-width: 640px; }

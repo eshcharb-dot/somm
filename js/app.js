@@ -361,20 +361,173 @@ async function onScanFile(e) {
   if (!file) return;
   try {
     const img = await SommAI.prepareImage(file);
-    img.scanMode = state.pendingScanMode || "bottle";
-    state.pendingImage = img;
-    state.chatMode = { bottle: "store", shelf: "store", list: "restaurant", menu: "restaurant" }[img.scanMode] || "chat";
-    switchTab("vera");
-    const ask = {
-      bottle: "Here's a bottle — what is it, and is it for me?",
-      shelf: "Here's the shelf in front of me. What should I grab?",
-      list: "Here's the wine list. What should I order?",
-      menu: "Here's the menu. What wine should I pair with what?",
-    }[img.scanMode];
-    sendToVera(ask, img);
+    const mode = state.pendingScanMode || "bottle";
+    img.scanMode = mode;
+    await runScanAnalysis(img, mode);
   } catch (err) {
     toast(err.message || "Couldn't process that photo");
   }
+}
+
+async function runScanAnalysis(img, mode) {
+  showScanResultScreen(img, mode, null); // loading state immediately
+  try {
+    const system = SommAI.buildScanSystemPrompt(state.profile, mode, state.settings.currency);
+    const userText = {
+      bottle: "Analyze this bottle for me.",
+      shelf: "Analyze this wine shelf and recommend the best bottles for my taste.",
+      list: "Analyze this wine list — what should I order and what's the best value?",
+      menu: "Analyze this menu and suggest what wine styles to pair with the dishes.",
+    }[mode] || "Analyze this photo.";
+    const messages = [{
+      role: "user",
+      content: [
+        { type: "image", source: { type: "base64", media_type: img.mediaType, data: img.b64 } },
+        { type: "text", text: userText },
+      ],
+    }];
+    const res = await SommAI.callAI({ messages, system, provider: "claude", model: "claude-opus-4-8", maxTokens: 2000 });
+    const result = SommAI.parseScanResult(res.text);
+    if (!result) throw new Error("Vera couldn't structure the analysis. Try a clearer photo or use chat.");
+    showScanResultScreen(img, mode, result);
+  } catch (err) {
+    showScanResultScreen(img, mode, { error: err.message || "Analysis failed — try again." });
+  }
+}
+
+function showScanResultScreen(img, mode, result) {
+  const screen = $("#screen-scan-result");
+  const modeLabel = { bottle: "Bottle", shelf: "Shelf Scan", list: "Wine List", menu: "Food Menu" }[mode] || "Scan";
+  screen.hidden = false;
+
+  if (!result) {
+    const loadSub = {
+      bottle: "Reading the label, checking your profile fit…",
+      shelf: "Scanning bottles, matching to your palate…",
+      list: "Finding the best value picks for you…",
+      menu: "Planning your perfect pairing…",
+    }[mode] || "Analyzing…";
+    screen.innerHTML = `
+      <div class="sr-loading">
+        <div class="sr-topbar"><span class="sr-mode-tag">${esc(modeLabel)}</span></div>
+        <img src="${img.dataUrl}" class="sr-photo" alt="Scanning">
+        <div class="sr-loading-msg">
+          <div class="vera-avatar">V</div>
+          <div>
+            <div class="sr-loading-title">Vera is looking…</div>
+            <div class="sr-loading-sub">${esc(loadSub)}</div>
+          </div>
+        </div>
+        <div class="sr-spinner"></div>
+      </div>`;
+    return;
+  }
+
+  if (result.error) {
+    screen.innerHTML = `
+      <div class="sr-wrap">
+        <div class="sr-topbar">
+          <button class="sr-back" id="sr-back">← Back</button>
+          <span class="sr-mode-tag">${esc(modeLabel)}</span>
+        </div>
+        <img src="${img.dataUrl}" class="sr-photo" alt="">
+        <div class="sr-body">
+          <div class="sr-error">
+            <div class="vera-avatar">V</div>
+            <div>
+              <p>${esc(result.error)}</p>
+              <button class="btn btn-outline" style="margin-top:10px" id="sr-chat-fb">Try in chat instead →</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    $("#sr-back").addEventListener("click", hideScanResultScreen);
+    $("#sr-chat-fb").addEventListener("click", () => openScanInChat(img, mode));
+    return;
+  }
+
+  const picks = result.picks || [];
+  const picksHeading = { bottle: "The verdict", menu: "Wine pairings", list: "Best picks", shelf: "Grab these" }[mode] || "Your picks";
+
+  screen.innerHTML = `
+    <div class="sr-wrap">
+      <div class="sr-topbar">
+        <button class="sr-back" id="sr-back">← Back</button>
+        <span class="sr-mode-tag">${esc(modeLabel)}</span>
+      </div>
+      <img src="${img.dataUrl}" class="sr-photo" alt="Your scan">
+      <div class="sr-body">
+        <div class="sr-summary">
+          <div class="vera-avatar sm">V</div>
+          <div class="vera-bubble">${esc(result.summary || "Here's what I found.")}</div>
+        </div>
+        ${picks.length ? `<h3 class="sr-picks-head">${esc(picksHeading)}</h3>` : ""}
+        <div id="sr-picks-list"></div>
+        <button class="btn btn-outline btn-block" id="sr-chat-cta">Ask Vera for more →</button>
+      </div>
+    </div>`;
+
+  const picksWrap = $("#sr-picks-list");
+  picks.forEach((pick) => picksWrap.appendChild(srPickCard(pick, mode)));
+
+  $("#sr-back").addEventListener("click", hideScanResultScreen);
+  $("#sr-chat-cta").addEventListener("click", () => openScanInChat(img, mode, picks[0]));
+}
+
+function srPickCard(pick, context) {
+  const el = document.createElement("div");
+  el.className = "sr-pick";
+  const typeClass = { red: "t-red", white: "t-white", rose: "t-rose", sparkling: "t-spark", orange: "t-orange", dessert: "t-dessert" }[pick.type] || "t-red";
+  const pvLower = (pick.price_verdict || "").toLowerCase();
+  const priceClass = pvLower.includes("great") ? "sr-price-great" : pvLower.includes("overpriced") ? "sr-price-bad" : "sr-price-ok";
+  const metaParts = [pick.grape, pick.region, pick.vintage].filter(Boolean);
+
+  el.innerHTML = `
+    <div class="sr-pick-head">
+      <span class="sr-rank">#${pick.rank}</span>
+      <span class="wc-type ${typeClass}">${esc((SommProfile.TYPE_LABELS[pick.type] || pick.type || "wine").toUpperCase())}</span>
+      <span class="sr-match-pct">${pick.match}% match</span>
+    </div>
+    <div class="sr-pick-name">${esc(pick.name)}</div>
+    <div class="sr-pick-meta">${esc(metaParts.join(" · "))}${pick.label_price ? ` · <strong>${esc(pick.label_price)}</strong>` : ""}</div>
+    ${pick.shelf_position ? `<div class="sr-position">📍 ${esc(pick.shelf_position)}</div>` : ""}
+    ${pick.match_reason ? `<div class="sr-why">✓ ${esc(pick.match_reason)}</div>` : ""}
+    ${pick.price_verdict ? `<span class="sr-price ${priceClass}">${esc(pick.price_verdict)}</span>` : ""}
+    ${pick.pairing ? `<div class="wc-pair">🍽 ${esc(pick.pairing)}</div>` : ""}
+    <div class="wc-actions">
+      <button class="rate" data-r="love">♥ Loved it</button>
+      <button class="rate" data-r="ok">Fine</button>
+      <button class="rate" data-r="no">Not for me</button>
+    </div>`;
+
+  $$(".rate", el).forEach((btn) => btn.addEventListener("click", () => {
+    const rating = btn.dataset.r;
+    const wine = { name: pick.name, region: pick.region, grape: pick.grape, type: pick.type, attrs: pick.attrs, price: pick.label_price };
+    SommProfile.learnFromRating(state.profile, wine, rating, context);
+    const dbRating = rating === "love" ? "loved" : rating === "ok" ? "fine" : "skip";
+    SommDB.saveRating(wine, dbRating, context);
+    SommDB.saveProfile(state.profile, state.settings);
+    $(".wc-actions", el).innerHTML = `<span class="rated">${
+      rating === "love" ? "Noted — more like this ♥" : rating === "ok" ? "Noted." : "Got it — steering away."
+    } <em>(profile ${SommProfile.confidencePct(state.profile)}%)</em></span>`;
+  }));
+  return el;
+}
+
+function hideScanResultScreen() {
+  $("#screen-scan-result").hidden = true;
+  switchTab("scan");
+}
+
+function openScanInChat(img, mode, topPick) {
+  hideScanResultScreen();
+  state.pendingImage = img;
+  state.chatMode = { bottle: "store", shelf: "store", list: "restaurant", menu: "restaurant" }[mode] || "chat";
+  switchTab("vera");
+  const msg = topPick
+    ? `Let's go deeper on ${topPick.name} — what else should I know?`
+    : { bottle: "Here's a bottle — what is it, and is it for me?", shelf: "Here's the shelf. What should I grab?", list: "Here's the wine list. What should I order?", menu: "Here's the menu. What wine do I pair?" }[mode];
+  sendToVera(msg, img);
 }
 
 // ============================== VERA CHAT ==============================

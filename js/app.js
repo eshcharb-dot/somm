@@ -48,6 +48,7 @@ function saveChat() {
 // ============================== BOOT ==============================
 document.addEventListener("DOMContentLoaded", async () => {
   loadChat();
+  SommAI.initFxRates(); // non-blocking — rates cached for prompt injection
   await SommAuth.init(onAuthStateChange);
   if (!state.profile.onboarded) {
     showOnboarding();
@@ -372,6 +373,7 @@ async function onScanFile(e) {
 async function runScanAnalysis(img, mode) {
   showScanResultScreen(img, mode, null); // loading state immediately
   try {
+    await SommAI.initFxRates(); // ensure fresh rates before building prompt
     const system = SommAI.buildScanSystemPrompt(state.profile, mode, state.settings.currency);
     const userText = {
       bottle: "Analyze this bottle for me.",
@@ -493,6 +495,7 @@ function srPickCard(pick, context) {
     ${pick.shelf_position ? `<div class="sr-position">📍 ${esc(pick.shelf_position)}</div>` : ""}
     ${pick.match_reason ? `<div class="sr-why">✓ ${esc(pick.match_reason)}</div>` : ""}
     ${pick.price_verdict ? `<span class="sr-price ${priceClass}">${esc(pick.price_verdict)}</span>` : ""}
+    ${pick.market_price_note ? `<div class="sr-market-note">🔍 ${esc(pick.market_price_note)}</div>` : ""}
     ${pick.pairing ? `<div class="wc-pair">🍽 ${esc(pick.pairing)}</div>` : ""}
     <div class="wc-actions">
       <button class="rate" data-r="love">♥ Loved it</button>

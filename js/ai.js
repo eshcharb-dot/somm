@@ -6,6 +6,43 @@ const BACKEND_URL = window.location.hostname === "localhost"
   ? "http://localhost:3000"
   : "https://backend-nu-ashen-76.vercel.app";
 
+// ---------- Live FX rates (Frankfurter API, no key required) ----------
+let _fxCache = { rates: null, ts: 0 };
+
+async function initFxRates() {
+  if (_fxCache.rates && Date.now() - _fxCache.ts < 3_600_000) return; // 1-hour cache
+  try {
+    const r = await fetch("https://api.frankfurter.app/latest?from=EUR");
+    if (!r.ok) return;
+    const d = await r.json();
+    _fxCache = { rates: { EUR: 1, ...d.rates }, ts: Date.now() };
+  } catch (e) {
+    console.warn("FX rates unavailable:", e.message);
+  }
+}
+
+// Build a currency block for system prompts — live rates + conversion instructions.
+function buildFxBlock(userCurrency) {
+  const sym2code = { "€": "EUR", "$": "USD", "£": "GBP", "₪": "ILS" };
+  const userCode = sym2code[userCurrency] || "ILS";
+  const rates = _fxCache.rates;
+  const userRate = rates ? (rates[userCode] || null) : null;
+
+  if (!rates || !userRate) {
+    return `CURRENCY: User's display currency is ${userCurrency}. Convert all prices to ${userCurrency}.`;
+  }
+
+  const pairs = [
+    { sym: "€", code: "EUR" }, { sym: "$", code: "USD" }, { sym: "£", code: "GBP" },
+  ].filter((p) => p.code !== userCode).map((p) => {
+    const fromEUR = rates[p.code] || 1;
+    const rate = userRate / fromEUR;
+    return `1${p.sym} = ${userCurrency}${rate.toFixed(1)}`;
+  });
+
+  return `CURRENCY: User's display currency is ${userCurrency}. Live exchange rates today: ${pairs.join(", ")}. Always express prices in ${userCurrency}. When you see a price in another currency, convert it AND show the original in brackets — e.g. "₪108 (€28)". Never show foreign currencies alone.`;
+}
+
 const VERA_SYSTEM_BASE = `You are Vera, the in-app sommelier of "Somm" — a personal AI wine companion.
 
 PERSONA
@@ -29,25 +66,32 @@ When you recommend one or more specific wines, output EACH as a wine card so the
 
 PHOTO ANALYSIS
 - Bottle photo → identify it (producer, region, grape, vintage if visible), estimate price range and style, give an honest match verdict vs their profile, and a card.
-- Shelf photo → read the visible bottles, pick the best 2–3 for this user and their budget; if labels are unreadable, say which section to look at.
+- Shelf photo → read the visible bottles, pick the best 2–3 for this user; if labels are unreadable, say which section to look at.
 - Wine list photo → pick best 2–3 value-for-money for their profile (and their food if mentioned). Flag overpriced traps. Use list prices in cards.
 - Food menu photo → suggest what wine style to order with what dish.
 - If the image is unclear, say what you can see and ask for a closer shot.
 
+PRICING INTELLIGENCE
+- You have strong knowledge of wine market prices (Wine-Searcher ranges, typical EU/UK/US retail, Israeli import prices).
+- Budget is a guide, not a filter — mention great wines outside the budget if they exist. A good deal matters more than an arbitrary range.
+- When you see or know a wine's price, compare it to what you know it typically sells for online and at retail.
+- If the price is above market, say so: "you'd find this for roughly ₪XX online." If it's below market, celebrate it.
+- Prices in photos may be in foreign currencies — convert to the user's currency using the live rates in the system context.
+
 STYLE RULES
 - Keep replies under ~120 words of prose (cards excluded). No headers, no bullet lists unless comparing. No markdown tables.
-- Currency: match the user's setting. Never invent exact vintages you can't see.`;
+- Never invent exact vintages you can't see. Never show prices in a currency other than the user's setting.`;
 
 function buildSystemPrompt(profile, mode, currency) {
   const modeCtx = {
     tonight: "CURRENT CONTEXT: The user is AT HOME deciding what to drink tonight and what to pair with their food.",
-    store: "CURRENT CONTEXT: The user is AT A WINE STORE deciding what to buy. Use the store budget band.",
-    restaurant: "CURRENT CONTEXT: The user is AT A RESTAURANT choosing from a wine list. Use the restaurant budget band. Value-for-money matters.",
+    store: "CURRENT CONTEXT: The user is AT A WINE STORE deciding what to buy. Use the store budget band as a rough guide, but don't skip great deals that are slightly over — mention them.",
+    restaurant: "CURRENT CONTEXT: The user is AT A RESTAURANT choosing from a wine list. Use the restaurant budget band. Value-for-money matters — flag overpriced pours.",
     chat: "CURRENT CONTEXT: Open conversation — could be anything wine-related.",
   }[mode] || "";
   return [
     VERA_SYSTEM_BASE,
-    `USER SETTINGS: currency ${currency || "€"}.`,
+    buildFxBlock(currency || "€"),
     modeCtx,
     "=== USER'S TASTE PROFILE ===",
     SommProfile.profileForPrompt(profile),
@@ -145,8 +189,9 @@ Return ONLY a <scan-result> JSON block — no prose before or after:
       "grape": "Grape variety",
       "type": "red|white|rose|sparkling|orange|dessert",
       "vintage": "2019 or null",
-      "label_price": "€28 exactly as printed, or null if not visible",
+      "label_price": "Convert to user's currency and show original in brackets — e.g. '₪108 (€28)' — or null if not visible",
       "price_verdict": "Great value|Fair price|Pricey|Overpriced",
+      "market_price_note": "Compare to your knowledge of typical online/retail price — e.g. 'Typically ₪85–100 online — fair here' or 'You'd find this for ₪60 online' or null if truly unknown",
       "shelf_position": null,
       "match_reason": "One specific sentence linking this wine to the user's actual palate dimensions (body/acid/tannin/etc.)",
       "match": 85,
@@ -174,8 +219,9 @@ Return ONLY a <scan-result> JSON block — no prose before or after:
       "grape": "Grape variety",
       "type": "red|white|rose|sparkling|orange|dessert",
       "vintage": "Year or null",
-      "label_price": "€28 as shown on shelf tag, or null",
+      "label_price": "Convert visible price to user's currency showing original in brackets — e.g. '₪108 (€28)' — or null",
       "price_verdict": "Great value|Fair price|Pricey|Overpriced",
+      "market_price_note": "Compare to your knowledge of typical online/retail price for this wine — e.g. 'Typically ₪90–110 online — fair here' or 'You'd find this for ₪65 online — skip it here' — or null",
       "shelf_position": "REQUIRED — precise visual wayfinding: which shelf (top/middle/bottom), left/center/right, what's next to it, label color and key design detail — enough to grab it in 5 seconds",
       "match_reason": "One specific sentence tying this to THIS user's profile (body/tannin/acid/sweetness/oak)",
       "match": 85,
@@ -205,8 +251,9 @@ Return ONLY a <scan-result> JSON block — no prose before or after:
       "grape": "Grape variety",
       "type": "red|white|rose|sparkling|orange|dessert",
       "vintage": "Year or null",
-      "label_price": "€XX exactly as printed on the list",
-      "price_verdict": "Great value|Fair price|Pricey|Overpriced — compare to typical retail markup",
+      "label_price": "Convert list price to user's currency with original in brackets — e.g. '₪310 (€85)' — use live rates from system context",
+      "price_verdict": "Great value|Fair price|Pricey|Overpriced — compare list price to typical retail (restaurant markup is usually 2-3×)",
+      "market_price_note": "Typical bottle price at retail to help the user calibrate — e.g. 'Bottle retails around ₪140 — reasonable markup here' or 'Retails ₪80, you're paying 4× — skip it'",
       "shelf_position": null,
       "match_reason": "Why this fits the user AND is the smart order here",
       "match": 85,
@@ -238,6 +285,7 @@ Return ONLY a <scan-result> JSON block — no prose before or after:
       "vintage": null,
       "label_price": null,
       "price_verdict": null,
+      "market_price_note": "Rough price range to expect for a bottle of this style — e.g. 'Expect ₪80–140 for a decent bottle' — helps the user calibrate when ordering",
       "shelf_position": null,
       "match_reason": "Which specific dishes from the menu this pairs with and why",
       "match": 88,
@@ -255,7 +303,8 @@ function buildScanSystemPrompt(profile, mode, currency) {
   const base = SCAN_PROMPTS[mode] || SCAN_PROMPTS.bottle;
   return [
     base,
-    `Currency for prices: ${currency || "€"}`,
+    buildFxBlock(currency || "€"),
+    "MARKET PRICING: Use your training knowledge of Wine-Searcher ranges and typical retail prices in EU/UK/US/Israel. Always populate market_price_note — even an approximate range ('typically ₪80–120') is more useful than null. If the shown price exceeds market, tell the user they can probably find it cheaper online.",
     "=== USER'S TASTE PROFILE (match_reason MUST reference specific profile data — body, acid, tannin, sweetness, etc.) ===",
     SommProfile.profileForPrompt(profile),
   ].join("\n\n");
@@ -272,4 +321,4 @@ function parseScanResult(text) {
   }
 }
 
-const SommAI = { buildSystemPrompt, buildScanSystemPrompt, parseScanResult, callAI, parseWineCards, prepareImage };
+const SommAI = { initFxRates, buildSystemPrompt, buildScanSystemPrompt, parseScanResult, callAI, parseWineCards, prepareImage };

@@ -57,7 +57,7 @@ function loadSettings() {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) return JSON.parse(raw);
   } catch (e) { /* fall through */ }
-  return { apiKey: "", groqKey: "", provider: "groq", model: "mixtral-8x7b-32768", currency: "€" };
+  return { currency: "€" };
 }
 
 function saveSettings(s) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }

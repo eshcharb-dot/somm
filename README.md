@@ -15,14 +15,25 @@
   - **Restaurant** — snap the wine list or menu → best value picks for your meal
 - **Photo analysis** — bottle, shelf, wine list, or food menu. Uses **Groq** (free tier) by default, or **Claude** (premium) if you bring your key.
 
-## Setup (2 minutes)
+## Setup (instant)
 
-1. Open the app, do the quiz.
-2. The Tonight tab works immediately — no key needed.
-3. For Vera chat + photo scanning:
-   - **Free**: Get a Groq API key at [console.groq.com](https://console.groq.com) (no credit card, 5,000 requests/month) → paste in **You → Settings**
-   - **Premium**: Get a Claude key at [console.anthropic.com](https://console.anthropic.com) → paste in **You → Settings** (for best wine analysis quality)
-   - Keys are stored only in your browser's localStorage; calls go directly from your device to the AI provider
+1. Open the app at https://eshcharb-dot.github.io/somm/ 
+2. Do the quiz → boom, you're ready
+3. **Vera AI is already enabled** — no setup needed, all users get free access
+   - Tonight tab works offline (local profile-based recommendations)
+   - Chat + photo scanning use backend-proxied Claude API (secure, no client-side keys)
+   - App works on mobile, no install needed
+
+## For your own deployment
+
+To run Somm on your own domain with your own API key:
+
+1. Deploy backend (Express server) to Vercel, Railway, or Fly.io — see [DEPLOYMENT.md](DEPLOYMENT.md)
+2. Set `ANTHROPIC_API_KEY` env var on your backend
+3. Update `BACKEND_URL` in `src/js/ai.js` to your deployed backend
+4. Redeploy frontend to GitHub Pages
+
+All users then get free AI instantly, with no API key management.
 
 ## Architecture
 
@@ -34,13 +45,20 @@ src/
   css/app.css     dark-cellar design system (Fraunces + Karla)
   js/data.js      48 wine styles w/ attribute vectors, pairing synonyms, quiz, cheat sheet
   js/profile.js   taste engine: quiz→profile, rating→learning, local recommender
-  js/ai.js        Claude API layer (browser-direct), Vera system prompt, image downscale
+  js/ai.js        AI layer (calls backend /api/ai endpoint), Vera system prompt, image downscale
   js/app.js       screens, router, chat, scan, journal, settings
+
+backend/
+  server.js       Express backend, proxies Claude/Groq calls, rate limiting
+  .env.example    template for API keys (never committed)
+  package.json    dependencies (express, cors, dotenv, node-fetch)
 ```
 
-- Profile, journal, chat, and API key persist in `localStorage`
-- AI replies embed `<wine>{json}</wine>` cards parsed into rateable UI cards — AI recommendations train the same profile as local ones
-- Photos are downscaled client-side to ≤1568px before upload
+- Profile, journal, and chat history persist in `localStorage`
+- **API keys never touch the frontend** — backend holds them securely
+- AI replies embed `<wine>{json}</wine>` cards parsed into rateable UI cards
+- Photos downscaled client-side to ≤1568px, base64 sent via backend
+- Backend enforces 100 req/minute per IP to prevent abuse
 
 ## Dev
 

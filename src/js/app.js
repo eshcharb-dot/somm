@@ -307,9 +307,9 @@ function runStorePicks() {
 
 // ============================== SCAN ==============================
 function renderScanHint() {
-  const hasKey = !!state.settings.apiKey || !!state.settings.groqKey;
-  $("#scan-nokey").hidden = hasKey;
-  $("#scan-ready").hidden = !hasKey;
+  // AI is always available via backend
+  $("#scan-nokey").hidden = true;
+  $("#scan-ready").hidden = false;
   if (!hasKey) {
     const list = $("#scan-cheatsheet");
     if (!list.childElementCount) {
@@ -357,12 +357,7 @@ function renderChat() {
   if (!state.chat.length) {
     const hello = document.createElement("div");
     hello.className = "msg assistant";
-    const hasKey = !!state.settings.apiKey || !!state.settings.groqKey;
-    hello.innerHTML = `<div class="vera-avatar sm">V</div><div class="bubble">${
-      hasKey
-        ? `Hey${state.profile.name ? " " + esc(state.profile.name) : ""}. Ask me anything — what to open, what to buy, what to order. Or snap a photo from the Scan tab.`
-        : `I need an API key to chat. Get a <strong>free</strong> Groq key at console.groq.com (no CC, 5K req/month), or bring your own Claude key. Add it in <strong>You → Settings</strong>. The Tonight tab works offline while you're deciding.`
-    }</div>`;
+    hello.innerHTML = `<div class="vera-avatar sm">V</div><div class="bubble">Hey${state.profile.name ? " " + esc(state.profile.name) : ""}. Ask me anything — what to open, what to buy, what to order. Or snap a photo from the Scan tab.</div>`;
     wrap.appendChild(hello);
   }
   state.chat.forEach((m) => wrap.appendChild(msgEl(m)));
@@ -450,15 +445,11 @@ async function sendToVera(text, image) {
     });
 
     const system = SommAI.buildSystemPrompt(state.profile, state.chatMode, state.settings.currency);
-    const provider = state.settings.provider || (state.settings.apiKey ? "claude" : "groq");
-    const apiKey = state.settings.apiKey || state.settings.groqKey || "";
-    if (!apiKey) throw new Error("No AI key configured. Add a Groq key (free) or Claude key in Settings.");
     const res = await SommAI.callAI({
       messages: apiMessages,
       system,
-      apiKey,
-      provider,
-      model: state.settings.model,
+      provider: "claude",
+      model: "claude-opus-4-8",
       maxTokens: 1500,
     });
     const { prose, cards } = SommAI.parseWineCards(res.text);
@@ -554,35 +545,14 @@ function renderYou() {
     </section>
 
     <section class="panel">
-      <h3>AI Provider</h3>
-      <label class="field-label">Choose free or premium</label>
-      <select id="set-provider" class="input">
-        <option value="groq" ${state.settings.provider === "groq" ? "selected" : ""}>Groq — Free (5K req/month, no CC)</option>
-        <option value="claude" ${state.settings.provider === "claude" ? "selected" : ""}>Claude — Premium (paid)</option>
-      </select>
-
-      <div id="groq-section">
-        <label class="field-label">Groq API key <span class="muted">(free tier, stored locally only)</span></label>
-        <input type="password" id="set-groq" class="input" placeholder="gsk_..." value="${esc(state.settings.groqKey)}" autocomplete="off">
-        <p class="muted small" style="margin-top: 6px;">Get free key at <a href="https://console.groq.com" target="_blank" style="color: var(--gold-soft)">console.groq.com</a> (no credit card). Mixtral 8x7b is excellent for reasoning.</p>
-      </div>
-
-      <div id="claude-section" style="display:none;">
-        <label class="field-label">Claude API key <span class="muted">(stored locally only)</span></label>
-        <input type="password" id="set-claude" class="input" placeholder="sk-ant-..." value="${esc(state.settings.apiKey)}" autocomplete="off">
-        <label class="field-label">Model</label>
-        <select id="set-model" class="input">
-          <option value="claude-opus-4-8" ${state.settings.model === "claude-opus-4-8" ? "selected" : ""}>Opus 4.8 — best</option>
-          <option value="claude-sonnet-4-6" ${state.settings.model === "claude-sonnet-4-6" ? "selected" : ""}>Sonnet 4.6 — faster</option>
-        </select>
-        <p class="muted small" style="margin-top: 6px;">Get key at <a href="https://console.anthropic.com" target="_blank" style="color: var(--gold-soft)">console.anthropic.com</a>.</p>
-      </div>
-
+      <h3>Settings</h3>
       <label class="field-label">Currency</label>
       <select id="set-currency" class="input">
         ${["€", "$", "£", "₪"].map((c) => `<option ${state.settings.currency === c ? "selected" : ""}>${c}</option>`).join("")}
       </select>
       <button class="btn btn-primary" id="set-save">Save settings</button>
+      <p class="muted small" style="margin-top: 12px;">✓ Vera AI powered by Claude (via secure backend)</p>
+      <p class="muted small">No API keys needed — just chat and scan. All requests are private.</p>
     </section>
 
     <section class="panel danger-zone">
@@ -597,27 +567,13 @@ function renderYou() {
     SommProfile.saveProfile(p);
     toast("Budget saved");
   });
-  $("#set-provider").addEventListener("change", () => {
-    const provider = $("#set-provider").value;
-    $("#groq-section").style.display = provider === "groq" ? "block" : "none";
-    $("#claude-section").style.display = provider === "claude" ? "block" : "none";
-  });
   $("#set-save").addEventListener("click", () => {
-    const provider = $("#set-provider").value;
-    state.settings.provider = provider;
-    if (provider === "groq") {
-      state.settings.groqKey = $("#set-groq").value.trim();
-    } else {
-      state.settings.apiKey = $("#set-claude").value.trim();
-      state.settings.model = $("#set-model").value;
-    }
     state.settings.currency = $("#set-currency").value;
     SommProfile.saveSettings(state.settings);
-    const hasKey = state.settings.groqKey || state.settings.apiKey;
-    toast(hasKey ? "Settings saved — Vera is online" : "Settings saved");
+    toast("Settings saved");
   });
   $("#p-export").addEventListener("click", () => {
-    const blob = new Blob([JSON.stringify({ profile: p, settings: { ...state.settings, apiKey: "", groqKey: "" } }, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify({ profile: p, settings: state.settings }, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "somm-profile.json";

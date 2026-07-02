@@ -10,6 +10,11 @@
   --muted: #94808a;
   --wine: #8e2f4a;
   --wine-bright: #c14d6d;
+  /* --wine-bright measures ~3.8-4.2:1 against --panel — below the 4.5:1 AA text threshold.
+     --error-text is a brighter tint of the same hue for text-on-dark auth/danger use
+     (~5.4:1 against --panel/--bg-soft), reserved for text that must stay readable rather
+     than decorative wine-toned accents. */
+  --error-text: #e0688a;
   --gold: #d4a73c;
   --gold-soft: #e8c97a;
   --green: #7fa86a;
@@ -90,7 +95,7 @@ select.input { appearance: none; }
   background: none; border: none; color: var(--muted); font: inherit;
   padding: 10px 6px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
 }
-.btn-ghost.danger { color: var(--wine-bright); }
+.btn-ghost.danger { color: var(--error-text); }
 
 /* ---------- onboarding ---------- */
 .onb-hero { padding-top: 8vh; display: flex; flex-direction: column; gap: 18px; }
@@ -394,7 +399,7 @@ select.input { appearance: none; }
   background: none; color: var(--muted); transition: all .15s ease;
 }
 .auth-tab.active { background: var(--panel-2); color: var(--cream); border: 1px solid var(--line); }
-.auth-err { color: var(--wine-bright); font-size: .86rem; margin: 8px 0 0; }
+.auth-err { color: var(--error-text); font-size: .86rem; margin: 8px 0 0; }
 .auth-divider {
   display: flex; align-items: center; gap: 12px; margin: 14px 0 10px;
   color: var(--muted); font-size: .8rem;

@@ -109,9 +109,28 @@ Then in frontend, `BACKEND_URL` is already `http://localhost:3000`.
 ## Security Notes
 
 - **API keys are NEVER sent to the frontend** — only the backend has them
-- **Backend enforces rate limiting** (100 req/min per IP) to prevent abuse
+- **Backend enforces rate limiting** (100 req/min per IP, hard-required via Upstash Redis
+  in production — see required env vars below) to prevent abuse
 - **All requests are proxied** — users can't see or intercept API calls
 - **Logs may contain user messages** — be careful with sensitive data
+- **Supabase tables are RLS-scoped to `auth.uid()`** — the client uses only the public
+  anon key, so Row Level Security is the only thing stopping one user from reading/writing
+  another user's rows. Policies are checked into `supabase/migrations/` (not just the live
+  dashboard) — see `supabase/migrations/README.md`. Apply them and re-run the Supabase
+  security advisors before going live, and again after any schema change.
+
+### Required backend env vars (fail-closed — the API refuses requests without these)
+
+- `ANTHROPIC_API_KEY` and/or `GROQ_API_KEY` — at least one AI provider
+- `SOMM_TOKEN` — shared secret checked against the client's `x-somm-token` header;
+  requests are now **rejected** if this is unset, rather than silently allowed through
+- `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` — durable, cross-instance rate
+  limiting and per-day token budget enforcement. Required in production (Vercel); without
+  them the backend refuses requests instead of silently falling back to a per-instance
+  in-memory limiter that doesn't actually cap anything on serverless
+- `SUPABASE_URL` / `SUPABASE_ANON_KEY` — optional but recommended: lets the backend verify
+  a signed-in user's session JWT (sent as `Authorization: Bearer <token>` by the client) so
+  abuse budgets can be scoped per-account instead of only per-IP
 
 ## Troubleshooting
 
@@ -131,7 +150,11 @@ Then in frontend, `BACKEND_URL` is already `http://localhost:3000`.
 
 ## Future Improvements
 
-- [ ] Redis-based rate limiting (per user, not per IP)
+- [x] Redis-based rate limiting (Upstash, required in production — see Security Notes)
+- [x] Per-user/day token budget, scoped by verified Supabase session JWT when present
+- [ ] Full backend enforcement that EVERY request carries a verified Supabase JWT (currently
+      the JWT strengthens the abuse budget when present; anonymous/guest use is still
+      allowed via the shared `SOMM_TOKEN`, matching the app's guest-mode UX)
 - [ ] Caching common wine questions
 - [ ] Usage analytics dashboard
 - [ ] Multi-provider failover (Claude → Groq if Claude fails)

@@ -66,7 +66,7 @@
             <span class="scan-ico">🍽️</span><strong>Food menu</strong><span>Pair my dinner</span>
           </button>
         </div>
-        <p class="muted small center">Photos are analyzed by Claude and never stored anywhere but this device.</p>
+        <p class="muted small center">Photos are sent to Claude for analysis and are not stored by Somm. Anthropic's privacy policy applies.</p>
       </div>
 
       <div id="scan-nokey" hidden>
@@ -138,7 +138,7 @@
   <div class="auth-overlay" id="auth-close"></div>
   <div class="auth-card">
     <div class="auth-logo">Somm<span class="accent">.</span></div>
-    <div class="auth-tab-row">
+    <div class="auth-tab-row" id="auth-tab-row">
       <button class="auth-tab active" id="at-signin">Sign in</button>
       <button class="auth-tab" id="at-signup">Create account</button>
     </div>
@@ -154,12 +154,39 @@
       <p id="auth-error" class="auth-err" hidden></p>
       <button class="btn btn-primary btn-block" type="submit" id="auth-submit">Sign in</button>
     </form>
-    <div class="auth-divider"><span>or</span></div>
-    <button class="btn google-btn" id="auth-google" type="button">
-      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.909-2.258c-.806.54-1.837.86-3.047.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/><path fill="#FBBC05" d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707s.102-1.167.282-1.707V4.961H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.961L3.964 7.293C4.672 5.166 6.656 3.58 9 3.58z"/></svg>
-      Continue with Google
-    </button>
-    <button class="btn-ghost auth-skip" id="auth-skip" type="button">Continue without signing in</button>
+    <button class="btn-ghost auth-forgot-link" id="auth-forgot-link" type="button">Forgot password?</button>
+
+    <div id="auth-forgot-view" hidden>
+      <p class="auth-forgot-copy">Enter your email and we'll send you a reset link.</p>
+      <label class="field-label">Email</label>
+      <input class="input" id="auth-forgot-email" type="email" placeholder="you@example.com" autocomplete="email" required>
+      <p id="auth-forgot-error" class="auth-err" hidden></p>
+      <button class="btn btn-primary btn-block" id="auth-forgot-submit" type="button">Send reset link</button>
+      <button class="btn-ghost" id="auth-forgot-back" type="button">← Back to sign in</button>
+    </div>
+
+    <div id="auth-forgot-sent" hidden>
+      <p class="auth-forgot-copy">Check <strong id="auth-forgot-sent-email"></strong> for a link to reset your password.</p>
+      <button class="btn-ghost" id="auth-forgot-done" type="button">← Back to sign in</button>
+    </div>
+
+    <div id="auth-newpw-view" hidden>
+      <p class="auth-forgot-copy">Set a new password for your account.</p>
+      <label class="field-label">New password</label>
+      <input class="input" id="auth-newpw" type="password" placeholder="••••••••" autocomplete="new-password" required minlength="6">
+      <p id="auth-newpw-error" class="auth-err" hidden></p>
+      <button class="btn btn-primary btn-block" id="auth-newpw-submit" type="button">Update password</button>
+    </div>
+
+    <div id="auth-oauth-block">
+      <div class="auth-divider"><span>or</span></div>
+      <button class="btn google-btn" id="auth-google" type="button">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.909-2.258c-.806.54-1.837.86-3.047.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/><path fill="#FBBC05" d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707s.102-1.167.282-1.707V4.961H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.961L3.964 7.293C4.672 5.166 6.656 3.58 9 3.58z"/></svg>
+        Continue with Google
+      </button>
+      <button class="btn-ghost auth-skip" id="auth-skip" type="button">Continue without signing in</button>
+      <p class="privacy-note">By signing in, your chat history, ratings and taste profile are stored in our cloud database (Supabase) indefinitely so they can sync across your devices. We don't share or sell your data, and you can delete it anytime from the You tab.</p>
+    </div>
   </div>
 </div>
 
@@ -169,5 +196,6 @@
 <script src="js/auth.js"></script>
 <script src="js/db.js"></script>
 <script src="js/app.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/somm/sw.js');</script>
 </body>
 </html>

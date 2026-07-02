@@ -48,6 +48,20 @@ async function saveProfile(profile, settings) {
   } catch (e) { console.warn("db.saveProfile:", e.message); }
 }
 
+// Fetch the signed-in user's cloud profile row, or null if none exists yet
+// (e.g. their very first sign-in) or on error. Callers should load this BEFORE ever
+// calling saveProfile, so a fresh/emptier local device never clobbers richer cloud data.
+async function getProfile() {
+  const user = SommAuth.getUser();
+  if (!user) return null;
+  try {
+    const { data, error } = await SommAuth.client()
+      .from("profiles").select("*").eq("id", user.id).maybeSingle();
+    if (error) throw error;
+    return data || null;
+  } catch (e) { console.warn("db.getProfile:", e.message); return null; }
+}
+
 async function getCrowdFavorites(limit) {
   try {
     const { data } = await SommAuth.client().rpc("get_crowd_favorites", { p_limit: limit || 10 });
@@ -55,4 +69,27 @@ async function getCrowdFavorites(limit) {
   } catch (e) { return []; }
 }
 
-const SommDB = { saveRating, saveMessage, saveProfile, getCrowdFavorites };
+// Permanently delete the signed-in user's rows from every user-scoped table. Used by the
+// "Delete my data" control so the app's privacy copy ("kept until you delete it") is actually
+// true — previously the only reset control (#p-reset) only cleared localStorage and never
+// touched Supabase.
+async function deleteMyData() {
+  const user = SommAuth.getUser();
+  if (!user) return { ok: false, error: "Not signed in" };
+  try {
+    const c = SommAuth.client();
+    const results = await Promise.all([
+      c.from("wine_ratings").delete().eq("user_id", user.id),
+      c.from("chat_messages").delete().eq("user_id", user.id),
+      c.from("profiles").delete().eq("id", user.id),
+    ]);
+    const failed = results.find((r) => r.error);
+    if (failed) throw failed.error;
+    return { ok: true };
+  } catch (e) {
+    console.warn("db.deleteMyData:", e.message);
+    return { ok: false, error: e.message };
+  }
+}
+
+const SommDB = { saveRating, saveMessage, saveProfile, getProfile, getCrowdFavorites, deleteMyData };

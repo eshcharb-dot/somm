@@ -168,12 +168,13 @@ function scoreWine(p, w, opts) {
   const regionKey = String(w.region || "").split(",")[0].trim();
   if (regionKey && p.regions[regionKey]) score += Math.max(-8, Math.min(8, p.regions[regionKey] * 3));
 
-  // Budget fit (store band by default)
+  // Budget fit (store band by default).
+  // Both wine.price and quiz bands are EUR reference values — compare directly.
   const band = opts.budget || p.budget.store;
-  const mid = (w.price[0] + w.price[1]) / 2;
-  if (mid < band[0] * 0.6) score -= 6;
-  else if (mid > band[1] * 1.4) score -= 25;
-  else if (mid > band[1]) score -= 10;
+  const midEUR = (w.price[0] + w.price[1]) / 2;
+  if (midEUR < band[0] * 0.6) score -= 6;
+  else if (midEUR > band[1] * 1.4) score -= 25;
+  else if (midEUR > band[1]) score -= 10;
 
   // Food pairing dominates when the user asked about food.
   if (opts.foodTags && opts.foodTags.length) {
@@ -258,5 +259,5 @@ const SommProfile = {
   DIM_KEYS, TYPE_KEYS, DIM_LABELS, TYPE_LABELS,
   loadProfile, saveProfile, loadSettings, saveSettings,
   defaultProfile, buildProfileFromQuiz, learnFromRating,
-  confidencePct, recommend, extractFoodTags, profileForPrompt, wineAllowed, matchPct,
+  confidencePct, recommend, extractFoodTags, profileForPrompt, wineAllowed, matchPct, scoreWine,
 };

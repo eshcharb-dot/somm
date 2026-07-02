@@ -162,6 +162,8 @@ select.input { appearance: none; }
 .wc-name { font-size: 1.3rem; line-height: 1.15; }
 .wc-meta { color: var(--muted); font-size: .88rem; margin-top: 2px; }
 .wc-meta strong { color: var(--cream-dim); }
+.wc-buy { font-size: .8rem; color: var(--gold); text-decoration: none; display: inline-block; margin-top: 4px; }
+.wc-buy:hover { text-decoration: underline; }
 .wc-why { color: var(--cream-dim); font-size: .94rem; margin-top: 8px; }
 .wc-pair { color: var(--gold-soft); font-size: .88rem; margin-top: 6px; }
 .wc-actions { display: flex; gap: 8px; margin-top: 12px; }
@@ -243,6 +245,25 @@ select.input { appearance: none; }
 .typing .tdot:nth-child(2) { animation-delay: .2s; }
 .typing .tdot:nth-child(3) { animation-delay: .4s; }
 @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+.typing-note { color: var(--muted); font-size: .84rem; margin-left: 4px; font-style: italic; }
+
+/* ---------- conversation starters ---------- */
+.chat-starters {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 0 0 8px 38px; /* indent to align under assistant bubble */
+  margin-top: -4px;
+}
+.chat-starter-btn {
+  font: inherit; font-size: .82rem; font-weight: 500; cursor: pointer;
+  background: var(--panel); color: var(--cream-dim);
+  border: 1px solid var(--line); border-radius: 99px;
+  padding: 8px 13px; min-height: 36px;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  transition: border-color .12s ease, color .12s ease;
+}
+.chat-starter-btn:hover { border-color: var(--gold); color: var(--cream); }
+.chat-starter-btn:active { transform: scale(.97); }
+
 /* chat form: fixed to bottom, JS moves it above keyboard */
 .chat-form {
   flex: 0 0 auto;
@@ -378,6 +399,8 @@ select.input { appearance: none; }
 }
 .google-btn:hover { border-color: var(--gold); }
 .auth-skip { display: block; width: 100%; text-align: center; margin-top: 4px; }
+.auth-forgot-link { display: block; margin: 2px auto 0; font-size: .84rem; padding: 6px; }
+.auth-forgot-copy { color: var(--cream-dim); font-size: .88rem; margin: 0 0 12px; }
 
 /* User card shown in You tab when logged in */
 .user-card {
@@ -400,6 +423,10 @@ select.input { appearance: none; }
   padding: 16px; margin-bottom: 14px; text-align: center;
 }
 .signin-nudge p { color: var(--cream-dim); margin: 0 0 12px; font-size: .9rem; }
+p.privacy-note {
+  color: var(--muted); font-size: .78rem; line-height: 1.5;
+  margin: 0 0 14px; text-align: left;
+}
 
 /* ---------- scan result screen ---------- */
 #screen-scan-result {
@@ -496,13 +523,20 @@ select.input { appearance: none; }
 }
 .sr-why { color: var(--green); font-size: .9rem; margin-bottom: 8px; line-height: 1.45; }
 
+.sr-price-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .sr-price {
   display: inline-block; font-size: .78rem; font-weight: 700;
-  padding: 3px 10px; border-radius: 99px; margin-bottom: 8px; letter-spacing: .04em;
+  padding: 3px 10px; border-radius: 99px; letter-spacing: .04em;
 }
 .sr-price-great { background: rgba(127, 168, 106, .2); color: var(--green); }
 .sr-price-ok { background: rgba(212, 167, 60, .14); color: var(--gold-soft); }
 .sr-price-bad { background: rgba(193, 77, 109, .2); color: var(--wine-bright); }
+/* Always-visible (no hover needed) caveat chip — this is the single most trust-critical
+   claim in the app, so the "not verified" disclosure must be readable at a glance on
+   phones, not hidden behind a title="" tooltip that touch users can't discover. */
+.sr-price-caveat {
+  font-size: .68rem; font-style: italic; color: var(--muted); opacity: .85;
+}
 .sr-market-note {
   font-size: .84rem; color: var(--muted); margin-bottom: 8px;
   padding: 7px 10px; background: rgba(148, 128, 138, .08);

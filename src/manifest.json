@@ -6,8 +6,8 @@
   "scope": "/somm/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "theme_color": "#160b11",
-  "background_color": "#160b11",
+  "theme_color": "#ffffff",
+  "background_color": "#ffffff",
   "icons": [
     {
       "src": "/somm/icon-192.png",

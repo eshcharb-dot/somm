@@ -17,6 +17,14 @@ function startFakeUpstash({ fail = false } = {}) {
       // upstashIncr/upstashIncrBy don't check res.ok before parsing, so a clean JSON error body
       // would silently parse to `{result: undefined}` instead of exercising the catch/"unavailable"
       // path. A destroyed socket reliably makes the fetch() call itself throw.
+      //
+      // A socket destroyed mid-request can still emit its own async 'error' event (e.g. ECONNRESET
+      // racing the destroy() call) — with zero listeners, Node treats that as an uncaught exception
+      // and crashes the whole test worker. This was intermittently corrupting node --test's binary
+      // IPC stream in CI (Ubuntu/Node 20 only — timing-dependent, never reproduced on Windows/local),
+      // surfacing as "Unable to deserialize cloned data" in a *different* test file entirely. A no-op
+      // listener is the standard safe pattern for a deliberate destroy().
+      req.socket.on("error", () => {});
       req.socket.destroy();
       return;
     }

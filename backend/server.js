@@ -169,6 +169,22 @@ async function checkDailyBudget(id, tokens, cap) {
   return { ok: total <= cap, reason: "exceeded" };
 }
 
+// Requires a verified Supabase JWT (not just the static x-somm-token) for vision requests
+// (photo scan/analysis — by far the most expensive call the app makes: Opus + image tokens).
+// Defaults OFF: both the Lead Engineer and PM's beta review agreed the static token + per-IP
+// rate limit/budget/CORS defenses are an acceptable bar for a small closed beta, and flipping
+// this on blocks the app's supported anonymous/guest scan flow — a real product decision, not
+// something to force silently. This finishes the TODO in src/js/ai.js (JWT-based gating) as an
+// opt-in switch to flip on before widening the beta or going public, rather than leaving the
+// wiring half-built. See hasImageContent() below and its call site in POST /api/ai.
+const REQUIRE_AUTH_FOR_VISION = String(process.env.REQUIRE_AUTH_FOR_VISION || "").toLowerCase() === "true";
+
+// True if any message carries an image content block — used to identify the "heavier" vision
+// calls (scan analysis, chat with a photo attached) that REQUIRE_AUTH_FOR_VISION gates.
+function hasImageContent(messages) {
+  return Array.isArray(messages) && messages.some((m) => Array.isArray(m && m.content) && m.content.some((c) => c && c.type === "image"));
+}
+
 // Verifies a Supabase session JWT by asking Supabase's own /auth/v1/user endpoint — no extra
 // dependency needed, just an HTTP round trip with the token. Returns the verified user id, or
 // null if no token was sent, SUPABASE_URL/SUPABASE_ANON_KEY aren't configured, or the token is
@@ -216,6 +232,13 @@ app.post("/api/ai", async (req, res) => {
   const userId = await verifySupabaseUser(req.headers["authorization"]);
   const ip = req.ip || req.connection.remoteAddress;
   const identity = userId ? `user:${userId}` : `ip:${ip}`;
+
+  // Opt-in stricter gate for the most expensive request shape (vision) — see
+  // REQUIRE_AUTH_FOR_VISION's comment above. Checked before rate limit/budget so a rejected
+  // request doesn't also consume the caller's quota.
+  if (REQUIRE_AUTH_FOR_VISION && !userId && hasImageContent(messages)) {
+    return res.status(401).json({ error: "Sign in to analyze photos — this keeps photo scans tied to an account." });
+  }
 
   const rate = await checkRateLimit(identity);
   if (!rate.ok) {
@@ -338,4 +361,5 @@ module.exports = app;
 module.exports.checkRateLimit = checkRateLimit;
 module.exports.checkDailyBudget = checkDailyBudget;
 module.exports.verifySupabaseUser = verifySupabaseUser;
+module.exports.hasImageContent = hasImageContent;
 module.exports.REQUESTS_PER_MINUTE = REQUESTS_PER_MINUTE;

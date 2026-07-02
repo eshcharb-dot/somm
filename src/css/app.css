@@ -75,6 +75,19 @@ h1, h2, h3, .logo, .wc-name, .onb-logo { font-family: var(--font-display); font-
 .input::placeholder { color: var(--muted); }
 select.input { appearance: none; }
 
+/* Keyboard/switch-access/TalkBack/VoiceOver focus indication. Previously only .input had a
+   focus style — every other interactive surface in the app (.btn, quiz .opt, .scan-tile,
+   .nav-btn, .rate, .mode-chip, .chat-starter-btn, and any plain link/input/select/textarea)
+   showed nothing when focused via keyboard. This one rule covers all of them generically
+   (they're all real <button>/<a>/<input> elements) instead of enumerating every class, and
+   only fires for keyboard focus (:focus-visible) — mouse/touch taps stay silent, same as the
+   browser default. */
+a:focus-visible, button:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+  outline: 3px solid var(--wine-bright);
+  outline-offset: 2px;
+}
+
 .btn {
   font: inherit; font-weight: 700; cursor: pointer;
   border-radius: 12px; padding: 13px 18px; border: none;
@@ -435,6 +448,25 @@ select.input { appearance: none; }
 .auth-skip { display: block; width: 100%; text-align: center; margin-top: 4px; }
 .auth-forgot-link { display: block; margin: 2px auto 0; font-size: .84rem; padding: 6px; }
 .auth-forgot-copy { color: var(--ink-dim); font-size: .88rem; margin: 0 0 12px; }
+
+/* ---------- generic confirm/prompt dialog (replaces native confirm()/prompt()) ---------- */
+#dlg-modal { position: fixed; inset: 0; z-index: 110; display: flex; align-items: center; justify-content: center; }
+#dlg-modal[hidden] { display: none; }
+.dlg-overlay {
+  position: absolute; inset: 0;
+  background: rgba(28, 20, 24, .4); backdrop-filter: blur(6px); cursor: pointer;
+}
+.dlg-card {
+  position: relative; z-index: 1;
+  width: min(380px, 92vw);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow-lg);
+  padding: 22px 22px 18px;
+  animation: pour .28s cubic-bezier(.16, 1, .3, 1);
+}
+#dlg-message { margin: 0 0 14px; font-size: .94rem; line-height: 1.45; white-space: pre-line; }
+#dlg-input-wrap { margin: 0 0 14px; }
+.dlg-actions { display: flex; justify-content: flex-end; gap: 8px; }
+#dlg-confirm.danger { background: var(--error-text); color: #fff; box-shadow: none; }
 
 /* User card shown in You tab when logged in */
 .user-card {

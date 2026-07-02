@@ -183,6 +183,21 @@
   </div>
 </div>
 
+<!-- GENERIC CONFIRM / PROMPT DIALOG (replaces native confirm()/prompt() — see js/app.js#sommConfirm/sommPrompt) -->
+<div id="dlg-modal" hidden>
+  <div class="dlg-overlay" id="dlg-close"></div>
+  <div class="dlg-card" role="alertdialog" aria-modal="true" aria-labelledby="dlg-message" tabindex="-1">
+    <p id="dlg-message"></p>
+    <div id="dlg-input-wrap" hidden>
+      <textarea class="input" id="dlg-input" rows="3"></textarea>
+    </div>
+    <div class="dlg-actions">
+      <button class="btn-ghost" id="dlg-cancel" type="button">Cancel</button>
+      <button class="btn btn-primary" id="dlg-confirm" type="button">OK</button>
+    </div>
+  </div>
+</div>
+
 <script src="js/data.js"></script>
 <script src="js/profile.js"></script>
 <script src="js/ai.js"></script>

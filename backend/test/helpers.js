@@ -113,6 +113,7 @@ function freshServer(envOverrides) {
     checkRateLimit: mod.checkRateLimit,
     checkDailyBudget: mod.checkDailyBudget,
     verifySupabaseUser: mod.verifySupabaseUser,
+    hasImageContent: mod.hasImageContent,
     REQUESTS_PER_MINUTE: mod.REQUESTS_PER_MINUTE,
   };
 }

@@ -84,7 +84,7 @@
             <button class="mode-chip" data-mode="chat">Anything</button>
           </div>
         </header>
-        <div id="chat-scroll"></div>
+        <div id="chat-scroll" aria-live="polite"></div>
         <form id="chat-form" class="chat-form">
           <input id="chat-input" class="input" type="text" placeholder="Ask Vera anything…" autocomplete="off" inputmode="text">
           <button class="btn btn-primary" type="submit" aria-label="Send">↑</button>
@@ -124,12 +124,12 @@
 <!-- ====================== SCAN RESULT SCREEN ====================== -->
 <div id="screen-scan-result" hidden></div>
 
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 
 <!-- AUTH MODAL -->
 <div id="auth-modal" hidden>
   <div class="auth-overlay" id="auth-close"></div>
-  <div class="auth-card">
+  <div class="auth-card" role="dialog" aria-modal="true" aria-label="Sign in to Somm" tabindex="-1">
     <div class="auth-logo">Somm<span class="accent">.</span></div>
     <div class="auth-tab-row" id="auth-tab-row">
       <button class="auth-tab active" id="at-signin">Sign in</button>

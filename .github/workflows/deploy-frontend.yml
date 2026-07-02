@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - run: node --test "src/js/__tests__/*.test.js"
+      - run: node --test src/js/__tests__/*.test.js
 
   deploy:
     needs: test

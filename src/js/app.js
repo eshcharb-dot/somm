@@ -88,7 +88,31 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   bindGlobal();
   bindAuthModal();
+  bindBackButton();
 });
+
+// ============================== ANDROID BACK BUTTON ==============================
+// switchTab()/showAuthModal()/showScanResultScreen() toggle plain hidden flags with no History
+// API integration, which on Android means the hardware/gesture back button exits the installed
+// PWA entirely instead of closing an overlay or stepping back a tab. We push a history entry
+// whenever an overlay opens (or a tab changes), and a single popstate listener below closes
+// whatever's on top instead of letting the back gesture fall through to the browser/OS.
+function bindBackButton() {
+  window.addEventListener("popstate", () => {
+    const st = history.state;
+    if (!$("#auth-modal").hidden && !(st && st.sommOverlay === "auth")) {
+      hideAuthModal();
+      return;
+    }
+    if (!$("#screen-scan-result").hidden && !(st && st.sommOverlay === "scanresult")) {
+      hideScanResultScreen();
+      return;
+    }
+    if (st && st.sommTab && st.sommTab !== state.tab) {
+      switchTab(st.sommTab, true);
+    }
+  });
+}
 
 async function onAuthStateChange(event, user) {
   if (event === "SIGNED_IN" && user) {
@@ -326,13 +350,17 @@ function showMain() {
   switchTab(state.tab || "tonight");
 }
 
-function switchTab(tab) {
+// fromPopstate is true when this call is a reaction to the back button (see bindBackButton) —
+// in that case the browser already moved the history pointer, so we must not push another entry.
+function switchTab(tab, fromPopstate) {
+  const changed = state.tab !== tab;
   state.tab = tab;
   $$(".nav-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   $$(".tab").forEach((t) => { t.hidden = t.id !== "tab-" + tab; });
   if (tab === "you") renderYou();
   if (tab === "vera") { renderChat(); $("#chat-scroll").scrollTop = $("#chat-scroll").scrollHeight; }
   if (tab === "tonight") renderTonightGreeting();
+  if (changed && !fromPopstate) history.pushState({ sommTab: tab }, "");
 }
 
 // ============================== WINE CARDS ==============================
@@ -349,6 +377,18 @@ function localCard(wine) {
   };
 }
 
+// Match percentages (whether computed locally by matchPct or estimated by the AI in scan/chat
+// cards) are always a fit ESTIMATE against the user's profile, never a verified/guaranteed
+// score — this makes that visible at the badge itself instead of relying on a caption users can
+// miss, and spells it out even more plainly while the profile barely has any rating history to
+// back it up (same "warming up" threshold used on the You tab's confidence ring).
+function matchBadgeText(pct) {
+  if (pct == null) return "";
+  const p = esc(String(pct));
+  const conf = SommProfile.confidencePct(state.profile);
+  return conf < 40 ? `${p}% estimated match` : `~${p}% match`;
+}
+
 function wineCardEl(card, context) {
   const el = document.createElement("div");
   el.className = "wine-card";
@@ -356,7 +396,7 @@ function wineCardEl(card, context) {
   el.innerHTML = `
     <div class="wc-head">
       <span class="wc-type ${typeClass}">${esc((SommProfile.TYPE_LABELS[card.type] || card.type || "wine").toUpperCase())}</span>
-      <span class="wc-match">${card.match != null ? esc(String(card.match)) + "% match" : ""}</span>
+      <span class="wc-match" title="Estimated fit vs your taste profile — not a guarantee">${matchBadgeText(card.match)}</span>
     </div>
     <div class="wc-name">${esc(card.name)}</div>
     <div class="wc-meta">${esc([card.grape, card.region].filter(Boolean).join(" · "))}${card.price ? ` · <strong>${esc(card.price)}</strong>` : ""}</div>
@@ -526,7 +566,12 @@ async function runScanAnalysis(img, mode) {
 function showScanResultScreen(img, mode, result) {
   const screen = $("#screen-scan-result");
   const modeLabel = { bottle: "Bottle", shelf: "Shelf Scan", list: "Wine List", menu: "Food Menu" }[mode] || "Scan";
+  // This screen is re-rendered in place across loading -> result/error, so only push a history
+  // entry on the transition INTO the screen, not on every re-render — otherwise each loading ->
+  // result swap would stack a redundant entry.
+  const wasHidden = screen.hidden;
   screen.hidden = false;
+  if (wasHidden) history.pushState({ sommOverlay: "scanresult" }, "");
 
   if (!result) {
     const loadSub = {
@@ -575,7 +620,7 @@ function showScanResultScreen(img, mode, result) {
           </div>
         </div>
       </div>`;
-    $("#sr-back").addEventListener("click", hideScanResultScreen);
+    $("#sr-back").addEventListener("click", closeScanResultScreen);
     $("#sr-chat-fb").addEventListener("click", () => openScanInChat(img, mode));
     if (showSignIn) $("#sr-signin-fb").addEventListener("click", showAuthModal);
     return;
@@ -605,7 +650,7 @@ function showScanResultScreen(img, mode, result) {
   const picksWrap = $("#sr-picks-list");
   picks.forEach((pick) => picksWrap.appendChild(srPickCard(pick, mode)));
 
-  $("#sr-back").addEventListener("click", hideScanResultScreen);
+  $("#sr-back").addEventListener("click", closeScanResultScreen);
   $("#sr-chat-cta").addEventListener("click", () => openScanInChat(img, mode, picks[0]));
 }
 
@@ -621,15 +666,15 @@ function srPickCard(pick, context) {
     <div class="sr-pick-head">
       <span class="sr-rank">#${esc(String(Number(pick.rank) || 0))}</span>
       <span class="wc-type ${typeClass}">${esc((SommProfile.TYPE_LABELS[pick.type] || pick.type || "wine").toUpperCase())}</span>
-      <span class="sr-match-pct">${esc(String(Number(pick.match) || 0))}% match</span>
+      <span class="sr-match-pct" title="Estimated fit vs your taste profile — not a guarantee">${matchBadgeText(Number(pick.match) || 0)}</span>
     </div>
     <div class="sr-pick-name">${esc(pick.name)}</div>
     <a class="wc-buy" href="https://www.wine-searcher.com/find/${encodeURIComponent(pick.name)}" target="_blank" rel="noopener noreferrer">Find online →</a>
     <div class="sr-pick-meta">${esc(metaParts.join(" · "))}${pick.label_price ? ` · <strong>${esc(pick.label_price)}</strong>` : ""}</div>
     ${pick.shelf_position ? `<div class="sr-position">📍 ${esc(pick.shelf_position)}</div>` : ""}
     ${pick.match_reason ? `<div class="sr-why">✓ ${esc(pick.match_reason)}</div>` : ""}
-    ${pick.price_verdict ? `<div class="sr-price-row"><span class="sr-price ${priceClass}">${esc(pick.price_verdict)}</span><span class="sr-price-caveat" title="AI estimate from training knowledge — not a live price lookup">not a live price check</span></div>` : ""}
-    ${pick.market_price_note ? `<div class="sr-market-note">🔍 ${esc(pick.market_price_note)}</div>` : ""}
+    ${pick.price_verdict ? `<div class="sr-price-row"><span class="sr-price ${priceClass}" title="AI estimate from training knowledge — not a live price lookup">Est.: ${esc(pick.price_verdict)}</span><span class="sr-price-caveat" title="AI estimate from training knowledge — not a live price lookup">not a live price check</span></div>` : ""}
+    ${pick.market_price_note ? `<div class="sr-market-note" title="AI estimate from training knowledge — not a live price lookup">🔍 Est. ${esc(pick.market_price_note)}</div>` : ""}
     ${pick.pairing ? `<div class="wc-pair">🍽 ${esc(pick.pairing)}</div>` : ""}
     <div class="wc-actions">
       <button class="rate" data-r="love">♥ Loved it</button>
@@ -653,11 +698,25 @@ function srPickCard(pick, context) {
 
 function hideScanResultScreen() {
   $("#screen-scan-result").hidden = true;
-  switchTab("scan");
+  // fromPopstate=true here too — this is just restoring the tab underneath the overlay, not a
+  // real navigation, so it must not push another history entry (see switchTab/bindBackButton).
+  switchTab("scan", true);
+}
+
+// UI-triggered close (back button in the screen, "try in chat" fallback, etc.) — as opposed to
+// hideScanResultScreen(), which is also called directly by the popstate handler once the
+// browser has already moved past the pushed "scanresult" history entry. Here we still own that
+// entry, so we replace it (not push a new one) to keep the stack from growing on repeated opens.
+function closeScanResultScreen() {
+  if ($("#screen-scan-result").hidden) return;
+  hideScanResultScreen();
+  if (history.state && history.state.sommOverlay === "scanresult") {
+    history.replaceState({ sommTab: state.tab }, "");
+  }
 }
 
 function openScanInChat(img, mode, topPick) {
-  hideScanResultScreen();
+  closeScanResultScreen();
   state.pendingImage = img;
   state.chatMode = { bottle: "store", shelf: "store", list: "restaurant", menu: "restaurant" }[mode] || "chat";
   switchTab("vera");
@@ -1048,8 +1107,72 @@ function renderYou() {
 }
 
 // ============================== AUTH MODAL ==============================
-function showAuthModal() { $("#auth-modal").hidden = false; }
-function hideAuthModal() { $("#auth-modal").hidden = true; }
+let authPrevFocus = null; // element to return focus to when the modal closes
+
+// Focusable elements within container, in DOM/tab order — used for the modal's focus trap.
+function focusableEls(container) {
+  return $$('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])', container)
+    .filter((el) => !el.hidden && el.offsetParent !== null);
+}
+
+function showAuthModal() {
+  const modal = $("#auth-modal");
+  if (!modal.hidden) return; // already open
+  authPrevFocus = document.activeElement;
+  modal.hidden = false;
+  history.pushState({ sommOverlay: "auth" }, "");
+  const first = focusableEls($(".auth-card"))[0];
+  (first || $(".auth-card")).focus();
+}
+
+// Raw hide — used both by popstate (browser already moved past our pushed entry) and by
+// closeAuthModal() below. Restores focus to whatever had it before the modal opened, since a
+// screen-reader/keyboard user's context would otherwise be silently lost.
+function hideAuthModal() {
+  const modal = $("#auth-modal");
+  if (modal.hidden) return;
+  modal.hidden = true;
+  if (authPrevFocus && typeof authPrevFocus.focus === "function") authPrevFocus.focus();
+  authPrevFocus = null;
+}
+
+// UI-triggered close (X button, backdrop, "continue without signing in", successful
+// sign-in/up). Replaces (rather than pops) the pushed "auth" history entry so the back stack
+// doesn't grow on repeated opens, without the async race a history.back() here would risk if
+// the caller immediately does more navigation afterward (e.g. nothing currently does, but
+// keeping this symmetric with closeScanResultScreen avoids that footgun for future callers).
+function closeAuthModal() {
+  if ($("#auth-modal").hidden) return;
+  hideAuthModal();
+  if (history.state && history.state.sommOverlay === "auth") {
+    // Auth can be opened ON TOP of the scan-result error screen (see the "Sign in for your own
+    // budget" fallback) — if that screen is still open underneath, the replaced entry must stay
+    // tagged as the scan-result overlay, not collapse to a bare tab entry, so a follow-up back
+    // press still closes it in one step instead of doing nothing.
+    const under = $("#screen-scan-result").hidden ? { sommTab: state.tab } : { sommOverlay: "scanresult" };
+    history.replaceState(under, "");
+  }
+}
+
+// Keyboard trap: Tab/Shift+Tab cycle within the modal instead of escaping to page content
+// behind the overlay, and Escape closes it — standard dialog behavior for keyboard/screen-
+// reader users, which #auth-modal previously had none of (no role=dialog either, fixed below).
+document.addEventListener("keydown", (e) => {
+  if ($("#auth-modal").hidden) return;
+  if (e.key === "Escape") { closeAuthModal(); return; }
+  if (e.key !== "Tab") return;
+  const focusable = focusableEls($(".auth-card"));
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+});
 
 // Switches which sub-view of the auth modal is visible: "signin" (sign in/up form),
 // "forgot" (request a reset email), "sent" (confirmation), or "newpw" (set a new password,
@@ -1081,8 +1204,8 @@ function bindAuthModal() {
 
   $("#at-signin").addEventListener("click", () => setMode("signin"));
   $("#at-signup").addEventListener("click", () => setMode("signup"));
-  $("#auth-close").addEventListener("click", hideAuthModal);
-  $("#auth-skip").addEventListener("click", hideAuthModal);
+  $("#auth-close").addEventListener("click", closeAuthModal);
+  $("#auth-skip").addEventListener("click", closeAuthModal);
 
   $("#auth-google").addEventListener("click", async () => {
     try { await SommAuth.signInWithGoogle(); }
@@ -1101,10 +1224,10 @@ function bindAuthModal() {
       if (mode === "signup") {
         await SommAuth.signUp(email, password, name);
         toast("Check your email to confirm your account!");
-        hideAuthModal();
+        closeAuthModal();
       } else {
         await SommAuth.signIn(email, password);
-        hideAuthModal();
+        closeAuthModal();
       }
     } catch (err) {
       showAuthError(err.message);
@@ -1160,7 +1283,7 @@ function bindAuthModal() {
       await SommAuth.updatePassword(pw);
       toast("Password updated ✓");
       $("#auth-newpw").value = "";
-      hideAuthModal();
+      closeAuthModal();
       setAuthView("signin");
     } catch (err) {
       errEl.textContent = err.message;

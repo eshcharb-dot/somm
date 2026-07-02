@@ -7,8 +7,14 @@
 // This is a lightweight abuse barrier, not a cryptographic secret — it's a static string
 // shipped in the client bundle, so anyone can read it from devtools/network tab and call the
 // proxy directly, bypassing origin checks. It only raises the bar for casual scraping.
-// TODO: replace with per-user auth (e.g. gate /api/ai on a valid Supabase session JWT verified
-// server-side) so abuse is tied to an account rather than one shared secret everyone shares.
+// The backend's real defenses are per-IP rate limiting, fail-closed Upstash-backed daily
+// budgets, and CORS (see backend/server.js) — this token alone was never meant to be the
+// whole story. Per-user auth is layered on top rather than replacing it: every call also
+// sends the signed-in user's Supabase JWT when available (see `authToken` below), which the
+// backend verifies server-side (verifySupabaseUser) to scope budgets per-account instead of
+// per-IP, and can additionally require (REQUIRE_AUTH_FOR_VISION, off by default for this
+// closed beta) for the most expensive request shape — photo scan/analysis. Turn that flag on
+// before widening the beta or going public.
 const SOMM_CLIENT_TOKEN = "somm-2025";
 
 const BACKEND_URL = window.location.hostname === "localhost"

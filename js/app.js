@@ -16,6 +16,8 @@ const state = {
   scanAbortToken: 0,         // bumped whenever the user backs out of an in-flight scan (see
                               // runScanAnalysis/closeScanResultScreen) so a late-arriving
                               // result doesn't reopen a screen the user already left.
+  scanLoadingTimer: null,    // interval id for the rotating sr-loading-sub reassurance text —
+                              // see showScanResultScreen's loading branch.
 };
 
 const $ = (sel, el) => (el || document).querySelector(sel);
@@ -103,6 +105,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 function bindBackButton() {
   window.addEventListener("popstate", () => {
     const st = history.state;
+    if (!$("#dlg-modal").hidden && !(st && st.sommOverlay === "dlg")) {
+      hideDlg();
+      const resolve = dlgResolve;
+      dlgResolve = null;
+      if (resolve) resolve(false);
+      return;
+    }
     if (!$("#auth-modal").hidden && !(st && st.sommOverlay === "auth")) {
       hideAuthModal();
       return;
@@ -598,6 +607,38 @@ function shouldShowSignInNudge() {
   return fire;
 }
 
+// Mode-specific rotation of reassurance sub-lines for the scan loading screen — same idea as
+// requestVeraReply's THINKING_MSGS for chat, but scan's Opus vision call routinely runs 10-25s
+// (vs. chat's near-instant-then-typing), so this keeps rotating on an interval the whole wait
+// instead of swapping in once. First line doubles as the immediate (0s) sub-line so there's no
+// flash of "Analyzing…" before it.
+const SCAN_LOADING_MSGS = {
+  bottle: [
+    "Reading the label, checking your profile fit…",
+    "Cross-referencing the vintage and region…",
+    "Comparing to what you've loved before…",
+    "Almost there — double-checking the details…",
+  ],
+  shelf: [
+    "Scanning bottles, matching to your palate…",
+    "Weighing each bottle against your taste…",
+    "Narrowing down the best picks on the shelf…",
+    "Almost there — ranking your top matches…",
+  ],
+  list: [
+    "Finding the best value picks for you…",
+    "Comparing prices against what's actually good…",
+    "Matching the list to your palate…",
+    "Almost there — picking the standouts…",
+  ],
+  menu: [
+    "Planning your perfect pairing…",
+    "Reading the dishes, thinking through pairings…",
+    "Matching wine styles to your meal…",
+    "Almost there — finalizing pairings…",
+  ],
+};
+
 function showScanResultScreen(img, mode, result) {
   const screen = $("#screen-scan-result");
   const modeLabel = { bottle: "Bottle", shelf: "Shelf Scan", list: "Wine List", menu: "Food Menu" }[mode] || "Scan";
@@ -608,13 +649,16 @@ function showScanResultScreen(img, mode, result) {
   screen.hidden = false;
   if (wasHidden) history.pushState({ sommOverlay: "scanresult" }, "");
 
+  // Any previous loading rotation is no longer relevant once we re-render (whether that's a
+  // fresh loading state, a result, or an error) — avoid leaking an interval that keeps firing
+  // against a screen that's moved on.
+  if (state.scanLoadingTimer) {
+    clearInterval(state.scanLoadingTimer);
+    state.scanLoadingTimer = null;
+  }
+
   if (!result) {
-    const loadSub = {
-      bottle: "Reading the label, checking your profile fit…",
-      shelf: "Scanning bottles, matching to your palate…",
-      list: "Finding the best value picks for you…",
-      menu: "Planning your perfect pairing…",
-    }[mode] || "Analyzing…";
+    const loadMsgs = SCAN_LOADING_MSGS[mode] || ["Analyzing…"];
     screen.innerHTML = `
       <div class="sr-loading">
         <div class="sr-topbar">
@@ -626,11 +670,20 @@ function showScanResultScreen(img, mode, result) {
           <div class="vera-avatar">V</div>
           <div>
             <div class="sr-loading-title">Vera is looking…</div>
-            <div class="sr-loading-sub">${esc(loadSub)}</div>
+            <div class="sr-loading-sub" id="sr-loading-sub">${esc(loadMsgs[0])}</div>
           </div>
         </div>
         <div class="sr-spinner"></div>
       </div>`;
+    // Rotate the reassurance line every 4s so a long wait (Opus vision routinely takes 10-25s)
+    // doesn't read as a hung spinner — same reassurance pattern as chat's THINKING_MSGS, just
+    // kept going for as long as the loading screen is up instead of swapping in once.
+    let loadIdx = 0;
+    state.scanLoadingTimer = setInterval(() => {
+      loadIdx = (loadIdx + 1) % loadMsgs.length;
+      const sub = $("#sr-loading-sub");
+      if (sub) sub.textContent = loadMsgs[loadIdx];
+    }, 4000);
     // Scanned the wrong thing? Bail without waiting out the up-to-~30s analysis. The in-flight
     // fetch itself isn't aborted (no AbortController plumbed through SommAI.callAI), but
     // runScanAnalysis checks scanAbortToken before acting on the result, so it resolves
@@ -642,9 +695,11 @@ function showScanResultScreen(img, mode, result) {
   if (result.error) {
     // The shared anon per-IP budget can be exhausted by several beta testers on the same
     // wifi hitting the same daily cap — nudge sign-in (which gets its own, larger, per-account
-    // budget) rather than leaving people to assume the app itself is broken.
-    const isBudgetErr = /budget/i.test(result.error);
-    const showSignIn = isBudgetErr && !SommAuth.getUser();
+    // budget) rather than leaving people to assume the app itself is broken. Same nudge for the
+    // backend's REQUIRE_AUTH_FOR_VISION 401 ("sign in to analyze photos" — see backend/server.js),
+    // if that's ever turned on.
+    const isAuthPromptErr = /budget|sign in/i.test(result.error);
+    const showSignIn = isAuthPromptErr && !SommAuth.getUser();
     screen.innerHTML = `
       <div class="sr-wrap">
         <div class="sr-topbar">
@@ -668,9 +723,9 @@ function showScanResultScreen(img, mode, result) {
     $("#sr-chat-fb").addEventListener("click", () => openScanInChat(img, mode));
     if (showSignIn) $("#sr-signin-fb").addEventListener("click", showAuthModal);
     $("#sr-feedback-fb").addEventListener("click", async () => {
-      const msg = prompt("What went wrong? (a couple of words is plenty)");
-      if (!msg || !msg.trim()) return;
-      const fbResult = await SommDB.saveFeedback(msg.trim(), `scan-error:${mode}`);
+      const msg = await sommPrompt("What went wrong? (a couple of words is plenty)", { placeholder: "e.g. wrong vintage, bad match…" });
+      if (!msg) return;
+      const fbResult = await SommDB.saveFeedback(msg, `scan-error:${mode}`);
       toast(fbResult.ok ? "Thanks — got it ✓" : "Couldn't send that — try again in a bit");
     });
     return;
@@ -756,6 +811,10 @@ function hideScanResultScreen() {
   state.scanAbortToken++; // invalidate any scan still in flight — see runScanAnalysis. Bumped
                            // here (not just in closeScanResultScreen) so this also covers the
                            // Android hardware/gesture back button, which calls this directly.
+  if (state.scanLoadingTimer) {
+    clearInterval(state.scanLoadingTimer);
+    state.scanLoadingTimer = null;
+  }
   $("#screen-scan-result").hidden = true;
   // fromPopstate=true here too — this is just restoring the tab underneath the overlay, not a
   // real navigation, so it must not push another history entry (see switchTab/bindBackButton).
@@ -1154,14 +1213,14 @@ function renderYou() {
     a.click();
     URL.revokeObjectURL(a.href);
   });
-  $("#p-redo").addEventListener("click", () => {
-    if (confirm("Redo the onboarding quiz? This resets your quiz-based taste dimensions and budget — your journal, ratings and everything Vera has learned from them are kept.")) {
+  $("#p-redo").addEventListener("click", async () => {
+    if (await sommConfirm("Redo the onboarding quiz? This resets your quiz-based taste dimensions and budget — your journal, ratings and everything Vera has learned from them are kept.", { confirmLabel: "Redo quiz" })) {
       state.profile.onboarded = false;
       showOnboarding();
     }
   });
-  $("#p-reset").addEventListener("click", () => {
-    if (confirm("Erase profile, journal, chat and settings on this device?")) {
+  $("#p-reset").addEventListener("click", async () => {
+    if (await sommConfirm("Erase profile, journal, chat and settings on this device?", { confirmLabel: "Erase everything", danger: true })) {
       localStorage.removeItem(PROFILE_KEY);
       localStorage.removeItem(CHAT_KEY);
       localStorage.removeItem(SETTINGS_KEY);
@@ -1176,7 +1235,8 @@ function renderYou() {
     });
     const deleteBtn = $("#p-delete-cloud");
     if (deleteBtn) deleteBtn.addEventListener("click", async () => {
-      if (!confirm("Permanently delete your ratings, chat history and taste profile from our servers, sign you out, and reset this device? This can't be undone. (Your sign-in account itself is not deleted — you can create a fresh profile with the same email.)")) return;
+      const ok = await sommConfirm("Permanently delete your ratings, chat history and taste profile from our servers, sign you out, and reset this device? This can't be undone. (Your sign-in account itself is not deleted — you can create a fresh profile with the same email.)", { confirmLabel: "Delete permanently", danger: true });
+      if (!ok) return;
       deleteBtn.disabled = true;
       deleteBtn.textContent = "Deleting…";
       const result = await SommDB.deleteMyData();
@@ -1196,6 +1256,105 @@ function renderYou() {
     $("#you-signin").addEventListener("click", () => showAuthModal());
   }
 }
+
+// ============================== GENERIC DIALOG ==============================
+// On-brand replacement for window.confirm()/window.prompt() — the rest of the app (auth modal,
+// You-tab feedback) uses custom-styled components with a focus trap, so a sudden unstyled OS
+// dialog (no app branding, especially jarring in an installed PWA) read as an unfinished
+// corner. Single reusable dialog backing both sommConfirm() and sommPrompt() below.
+let dlgPrevFocus = null; // element to return focus to when the dialog closes
+let dlgResolve = null;   // resolves the promise returned by sommConfirm/sommPrompt
+
+function openDlg({ message, isPrompt, placeholder, value, confirmLabel, cancelLabel, danger }) {
+  return new Promise((resolve) => {
+    dlgResolve = resolve;
+    const modal = $("#dlg-modal");
+    dlgPrevFocus = document.activeElement;
+    $("#dlg-message").textContent = message;
+    const input = $("#dlg-input");
+    $("#dlg-input-wrap").hidden = !isPrompt;
+    input.value = value || "";
+    input.placeholder = placeholder || "";
+    const confirmBtn = $("#dlg-confirm");
+    confirmBtn.textContent = confirmLabel || (isPrompt ? "Send" : "OK");
+    confirmBtn.classList.toggle("danger", !!danger);
+    $("#dlg-cancel").textContent = cancelLabel || "Cancel";
+    modal.hidden = false;
+    history.pushState({ sommOverlay: "dlg" }, "");
+    (isPrompt ? input : confirmBtn).focus();
+  });
+}
+
+// Raw hide — used both by popstate (browser already moved past our pushed entry) and by
+// closeDlg() below. Mirrors hideAuthModal()'s focus-restore behavior.
+function hideDlg() {
+  const modal = $("#dlg-modal");
+  if (modal.hidden) return;
+  modal.hidden = true;
+  if (dlgPrevFocus && typeof dlgPrevFocus.focus === "function") dlgPrevFocus.focus();
+  dlgPrevFocus = null;
+}
+
+// UI-triggered close (Cancel, backdrop, Escape, OK/Send). `result` is `false`/`null` for a
+// cancel, or `true`/the trimmed input string for a confirm — resolves whichever promise
+// sommConfirm/sommPrompt handed back to the caller.
+function closeDlg(result) {
+  if ($("#dlg-modal").hidden) return;
+  hideDlg();
+  if (history.state && history.state.sommOverlay === "dlg") {
+    // The dialog can be opened ON TOP of the scan-result error screen (the "Something off?
+    // Tell Vera" fallback) — if that screen is still open underneath, the replaced entry must
+    // stay tagged as the scan-result overlay, same reasoning as closeAuthModal.
+    const under = $("#screen-scan-result").hidden ? { sommTab: state.tab } : { sommOverlay: "scanresult" };
+    history.replaceState(under, "");
+  }
+  const resolve = dlgResolve;
+  dlgResolve = null;
+  if (resolve) resolve(result);
+}
+
+// Promise<boolean> — replacement for `confirm(message)`.
+function sommConfirm(message, opts) {
+  return openDlg({ message, isPrompt: false, ...opts });
+}
+
+// Promise<string|null> — replacement for `prompt(message)`. Resolves the trimmed input string
+// on submit, or null on cancel/Escape/backdrop (never an empty string — same as openDlg's
+// "empty submit does nothing" guard on the confirm button).
+function sommPrompt(message, opts) {
+  return openDlg({ message, isPrompt: true, ...opts }).then((v) => (v === false ? null : v));
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  $("#dlg-cancel").addEventListener("click", () => closeDlg(false));
+  $("#dlg-close").addEventListener("click", () => closeDlg(false));
+  $("#dlg-confirm").addEventListener("click", () => {
+    const isPrompt = !$("#dlg-input-wrap").hidden;
+    if (isPrompt) {
+      const val = $("#dlg-input").value.trim();
+      if (!val) return; // same as native prompt() — empty submit does nothing
+      closeDlg(val);
+    } else {
+      closeDlg(true);
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if ($("#dlg-modal").hidden) return;
+    if (e.key === "Escape") { closeDlg(false); return; }
+    if (e.key !== "Tab") return;
+    const focusable = focusableEls($(".dlg-card"));
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  });
+});
 
 // ============================== AUTH MODAL ==============================
 let authPrevFocus = null; // element to return focus to when the modal closes

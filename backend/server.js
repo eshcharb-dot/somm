@@ -27,6 +27,28 @@ if (!SOMM_TOKEN) {
   console.error("SEVERE: SOMM_TOKEN is not set — /api/ai will reject ALL requests (fail closed) until it is configured.");
 }
 
+// Write-only visibility into unexpected upstream/provider failures (round 5 finding: no error
+// monitoring existed anywhere — Vercel's console logs are ephemeral and nobody was watching
+// them). Mirrors the client-side SommDB.logError table. Fire-and-forget: never awaited by
+// callers, never throws, and never delays a response to the user.
+function logBackendError(context, err) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return;
+  fetch(`${SUPABASE_URL}/rest/v1/error_reports`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({
+      source: "backend",
+      context,
+      message: String((err && err.message) || err || "unknown error").slice(0, 2000),
+      stack: err && err.stack ? String(err.stack).slice(0, 4000) : null,
+    }),
+  }).catch(() => {});
+}
+
 // Rate limiting + daily budget.
 // NOTE: on Vercel serverless, this process is not a long-lived singleton — every cold start
 // and every concurrent instance gets its own empty in-memory Map, so a bare in-memory limiter
@@ -230,6 +252,7 @@ app.post("/api/ai", async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error("AI error:", err.message);
+    logBackendError(`api/ai:${req.body.provider || "claude"}`, err);
     res.status(500).json({ error: err.message });
   }
 });

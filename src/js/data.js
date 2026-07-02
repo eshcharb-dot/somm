@@ -372,18 +372,4 @@ const QUIZ = [
   },
 ];
 
-// Restaurant cheat-sheet for offline mode.
-const RESTO_CHEATSHEET = [
-  { cuisine: "Italian", tip: "Chianti Classico or Barbera with anything tomato; Vermentino or Pinot Grigio with seafood; Lambrusco with salumi." },
-  { cuisine: "French bistro", tip: "Côtes-du-Rhône with steak frites; Chablis or Sancerre with fish; Cru Beaujolais covers the whole table." },
-  { cuisine: "Steakhouse", tip: "Cabernet, Malbec, or Rioja Reserva. If the list is fancy, Châteauneuf-du-Pape over-delivers." },
-  { cuisine: "Sushi / Japanese", tip: "Champagne or dry Riesling. Chablis if they have it. Avoid big oaky reds at all costs." },
-  { cuisine: "Thai / spicy Asian", tip: "Off-dry Riesling or Gewürztraminer — a touch of sweetness tames the heat. Avoid high-alcohol reds." },
-  { cuisine: "Indian", tip: "Gewürztraminer, off-dry Riesling, or a juicy chillable red like Beaujolais. Skip tannic reds with spice." },
-  { cuisine: "Seafood / Mediterranean", tip: "Albariño, Assyrtiko, Vermentino, Picpoul — anything coastal, crisp and saline." },
-  { cuisine: "Middle Eastern", tip: "Rosé and lighter reds shine. Tavel with mixed mezze; Syrah with grilled lamb." },
-  { cuisine: "Burgers / BBQ", tip: "Zinfandel, Shiraz, Malbec. Sparkling is the sleeper pick with anything fried." },
-  { cuisine: "Vegetarian / salads", tip: "Grüner Veltliner and Sauvignon Blanc handle green things (even asparagus) best." },
-];
-
-const SOMM_DATA = { WINES, FOOD_SYNONYMS, QUIZ, RESTO_CHEATSHEET };
+const SOMM_DATA = { WINES, FOOD_SYNONYMS, QUIZ };

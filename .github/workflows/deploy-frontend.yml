@@ -1,0 +1,38 @@
+name: Deploy Frontend
+
+# Auto-deploys src/ to the gh-pages branch on every push to main that touches it, mirroring
+# deploy-backend.yml's approach. Previously this required a manual `git subtree push --prefix
+# src origin gh-pages` — easy to forget, and the exact drift that let production run stale/
+# unhardened code for weeks after round 1's fix was written (see deploy-backend.yml). Gated
+# behind the frontend test suite so a broken build can't reach gh-pages.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - ".github/workflows/deploy-frontend.yml"
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node --test "src/js/__tests__/*.test.js"
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy src/ to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./src
+          publish_branch: gh-pages

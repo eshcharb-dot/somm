@@ -302,7 +302,17 @@ if (require.main === module) {
   });
 }
 
-// Exported for the test suite (test/server.test.js) — covers the cost-control logic most
-// directly responsible for preventing a runaway API bill: checkRateLimit, checkDailyBudget,
-// verifySupabaseUser.
-module.exports = { app, checkRateLimit, checkDailyBudget, verifySupabaseUser, REQUESTS_PER_MINUTE };
+// The default export MUST be the Express app itself (a callable (req, res) handler) — Vercel's
+// Node runtime detects and invokes it directly. Exporting a wrapper object here (even one that
+// includes `app`) breaks production with "Can't detect way to handle request" — Vercel only
+// looks for a function, not a property on some other shape.
+//
+// The test suite (test/*.test.js) needs the cost-control internals (checkRateLimit,
+// checkDailyBudget, verifySupabaseUser) too, so they're attached as properties on the exported
+// app function rather than wrapped in an object — `require("../server")` still returns a valid
+// Express handler, while `require("../server").checkRateLimit` etc. remain accessible.
+module.exports = app;
+module.exports.checkRateLimit = checkRateLimit;
+module.exports.checkDailyBudget = checkDailyBudget;
+module.exports.verifySupabaseUser = verifySupabaseUser;
+module.exports.REQUESTS_PER_MINUTE = REQUESTS_PER_MINUTE;

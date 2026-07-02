@@ -96,7 +96,17 @@ function freshServer(envOverrides) {
     if (saved[k] === undefined) delete process.env[k];
     else process.env[k] = saved[k];
   });
-  return mod;
+  // server.js exports the Express app itself as module.exports (required by Vercel's Node
+  // runtime — a wrapper object isn't detected as a valid handler), with the cost-control
+  // internals attached as properties on it. Normalize to a plain object here so callers can
+  // destructure { app, checkRateLimit, ... } without caring about that export shape.
+  return {
+    app: mod,
+    checkRateLimit: mod.checkRateLimit,
+    checkDailyBudget: mod.checkDailyBudget,
+    verifySupabaseUser: mod.verifySupabaseUser,
+    REQUESTS_PER_MINUTE: mod.REQUESTS_PER_MINUTE,
+  };
 }
 
 module.exports = { startFakeUpstash, startFakeSupabase, closeServer, freshServer };

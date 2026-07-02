@@ -2,6 +2,15 @@
 // Backend at BACKEND_URL handles API calls securely.
 "use strict";
 
+// Shared token checked by the backend proxy (process.env.SOMM_TOKEN).
+// Set SOMM_TOKEN in Vercel env vars and keep this value in sync.
+// This is a lightweight abuse barrier, not a cryptographic secret — it's a static string
+// shipped in the client bundle, so anyone can read it from devtools/network tab and call the
+// proxy directly, bypassing origin checks. It only raises the bar for casual scraping.
+// TODO: replace with per-user auth (e.g. gate /api/ai on a valid Supabase session JWT verified
+// server-side) so abuse is tied to an account rather than one shared secret everyone shares.
+const SOMM_CLIENT_TOKEN = "somm-2025";
+
 const BACKEND_URL = window.location.hostname === "localhost"
   ? "http://localhost:3000"
   : "https://backend-nu-ashen-76.vercel.app";
@@ -98,12 +107,22 @@ function buildSystemPrompt(profile, mode, currency) {
   ].join("\n\n");
 }
 
-// Call backend AI proxy (no client-side keys needed)
-async function callAI({ messages, system, provider, model, maxTokens }) {
+// Call backend AI proxy (no client-side keys needed).
+// `authToken` (optional) is the signed-in user's Supabase session JWT — sent so the backend
+// can verify identity server-side and scope abuse/rate limits to an account instead of only
+// an IP address. See SommAuth.getAccessToken() and backend/server.js#verifySupabaseUser.
+async function callAI({ messages, system, provider, model, maxTokens, authToken }) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
   try {
+    const headers = {
+      "content-type": "application/json",
+      "x-somm-token": SOMM_CLIENT_TOKEN,
+    };
+    if (authToken) headers["authorization"] = `Bearer ${authToken}`;
     const res = await fetch(`${BACKEND_URL}/api/ai`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers,
       body: JSON.stringify({
         provider: provider || "claude",
         messages,
@@ -111,20 +130,29 @@ async function callAI({ messages, system, provider, model, maxTokens }) {
         model,
         maxTokens: maxTokens || 1500,
       }),
+      signal: controller.signal,
     });
+
+    clearTimeout(timeout);
 
     if (!res.ok) {
       const err = await res.json();
-      if (res.status === 429) throw new Error("Rate limited — wait a moment and try again.");
-      if (res.status === 503) throw new Error("AI service unavailable — try again later.");
+      // Prefer the backend's specific message (e.g. daily budget vs per-minute rate limit)
+      // over a generic one — it tells the user what actually happened and what to do.
+      if (res.status === 429) throw new Error(err.error || "Rate limited — wait a moment and try again.");
+      if (res.status === 503) throw new Error(err.error || "AI service unavailable — try again later.");
       throw new Error(err.error || `Backend error ${res.status}`);
     }
 
     const data = await res.json();
     return { text: data.text, usage: data.usage, stopReason: data.stopReason };
   } catch (err) {
+    clearTimeout(timeout);
+    if (err.name === "AbortError") {
+      throw new Error("Vera is taking too long — tap to try again.");
+    }
     if (err.message.includes("fetch")) {
-      throw new Error("Can't reach AI backend. Check your internet or backend URL.");
+      throw new Error("Can't reach Vera right now. Check your internet connection and try again.");
     }
     throw err;
   }
@@ -321,4 +349,16 @@ function parseScanResult(text) {
   }
 }
 
-const SommAI = { initFxRates, buildSystemPrompt, buildScanSystemPrompt, parseScanResult, callAI, parseWineCards, prepareImage };
+// Convert a EUR-denominated price to the user's display currency using cached FX rates.
+// Falls back 1:1 if rates aren't loaded yet (FX fetch is non-blocking).
+function convertFromEUR(amountEUR, currency) {
+  const sym2code = { "€": "EUR", "$": "USD", "£": "GBP", "₪": "ILS" };
+  const code = sym2code[currency] || "EUR";
+  const rates = _fxCache.rates;
+  if (!rates || !rates[code]) return Math.round(amountEUR);
+  return Math.round(amountEUR * rates[code]);
+}
+
+function getFxRates() { return _fxCache.rates; }
+
+const SommAI = { initFxRates, buildSystemPrompt, buildScanSystemPrompt, parseScanResult, callAI, parseWineCards, prepareImage, convertFromEUR, getFxRates };

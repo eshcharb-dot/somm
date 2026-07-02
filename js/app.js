@@ -42,14 +42,31 @@ function saveChat() {
     if (m.dataUrl && i < arr.length - 4) return { ...m, dataUrl: null };
     return m;
   });
-  localStorage.setItem(CHAT_KEY, JSON.stringify(slim));
+  try {
+    localStorage.setItem(CHAT_KEY, JSON.stringify(slim));
+  } catch (e) {
+    // QuotaExceededError — strip ALL dataUrls except the two most recent, then retry once.
+    // If it still fails, swallow silently so the chat UI always renders.
+    try {
+      const stripped = slim.map((m, i, arr) => {
+        if (m.dataUrl && i < arr.length - 2) return { ...m, dataUrl: null };
+        return m;
+      });
+      localStorage.setItem(CHAT_KEY, JSON.stringify(stripped));
+    } catch (_) { /* storage full — UI still works, persistence skipped */ }
+  }
 }
 
 // ============================== BOOT ==============================
 document.addEventListener("DOMContentLoaded", async () => {
   loadChat();
   SommAI.initFxRates(); // non-blocking — rates cached for prompt injection
-  await SommAuth.init(onAuthStateChange);
+  try {
+    await SommAuth.init(onAuthStateChange);
+  } catch (e) {
+    // Auth is optional — localStorage works without Supabase. Never block the boot.
+    console.warn("Auth init failed, continuing as guest:", e.message);
+  }
   if (!state.profile.onboarded) {
     showOnboarding();
   } else {
@@ -61,12 +78,45 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 async function onAuthStateChange(event, user) {
   if (event === "SIGNED_IN" && user) {
-    SommDB.saveProfile(state.profile, state.settings);
-    toast("Profile synced to cloud ✓");
+    await syncProfileOnSignIn();
     if (state.tab === "you") renderYou();
   }
   if (event === "SIGNED_OUT") {
     if (state.tab === "you") renderYou();
+  }
+  if (event === "PASSWORD_RECOVERY") {
+    // User clicked the reset-password link from their email — Supabase already gave us a
+    // recovery session; prompt for a new password instead of silently signing them in.
+    showAuthModal();
+    setAuthView("newpw");
+  }
+}
+
+// Pull the cloud profile down BEFORE ever pushing this device's local profile up.
+// Without this, signing in on a second device blindly overwrote whatever palate/ratings
+// history the account already had in Supabase with this device's (possibly blank) local
+// profile — exactly the data loss the "your ratings travel with you" sign-in prompt promises
+// won't happen. If the cloud already has a richer profile (more rated wines), adopt it
+// locally instead of clobbering it; otherwise push this device's profile up as before.
+async function syncProfileOnSignIn() {
+  let cloud = null;
+  try { cloud = await SommDB.getProfile(); } catch (e) { console.warn("cloud profile fetch failed", e); }
+
+  if (cloud && (cloud.ratings_count || 0) > (state.profile.ratingCount || 0)) {
+    state.profile.name = cloud.display_name || state.profile.name;
+    state.profile.dims = { ...state.profile.dims, ...(cloud.palate || {}) };
+    if (typeof cloud.adventurousness === "number") state.profile.adventure = cloud.adventurousness;
+    state.profile.ratingCount = cloud.ratings_count;
+    state.profile.onboarded = true;
+    SommProfile.saveProfile(state.profile);
+    if (cloud.currency) {
+      state.settings.currency = cloud.currency;
+      SommProfile.saveSettings(state.settings);
+    }
+    toast("Synced your profile from the cloud ✓");
+  } else {
+    SommDB.saveProfile(state.profile, state.settings);
+    toast("Profile synced to cloud ✓");
   }
 }
 
@@ -120,11 +170,10 @@ function renderQuizStep() {
     wrap.innerHTML = `
       <div class="onb-hero">
         <div class="onb-logo">Somm<span class="accent">.</span></div>
-        <p class="onb-tag">Your pocket sommelier</p>
+        <p class="onb-tag">Wine recs built around your palate</p>
         <div class="vera-intro">
           <div class="vera-avatar">V</div>
-          <div class="vera-bubble">Hi, I'm <strong>Vera</strong> — your sommelier. Eight quick questions and I'll start
-          learning your palate. No wine knowledge needed, I promise. <em>In vino veritas.</em></div>
+          <div class="vera-bubble">Hi, I'm <strong>Vera</strong> — your personal sommelier. A few quick questions and I'll start recommending wines that actually fit <em>your</em> taste — not just the crowd favourites. No wine knowledge needed.</div>
         </div>
         <input id="onb-name" class="input" type="text" placeholder="What should I call you? (optional)" maxlength="24" autocomplete="given-name" />
         <button class="btn btn-primary btn-block" id="onb-start">Let's go</button>
@@ -187,8 +236,24 @@ function renderQuizStep() {
 
 function finishOnboarding() {
   const name = state.profile.name;
-  state.profile = SommProfile.buildProfileFromQuiz(state.quizAnswers);
-  state.profile.name = name;
+  const existing = state.profile;
+  const quizProfile = SommProfile.buildProfileFromQuiz(state.quizAnswers);
+  // Merge the quiz-derived taste signals into the EXISTING profile instead of replacing it
+  // wholesale — redoing onboarding must not wipe ratingCount/history/grapes/regions, which is
+  // exactly what the "Redo onboarding" confirm() copy promises ("Your journal and ratings are
+  // kept"). Only the quiz-driven fields (dims/types/adventure/budget/experience/nos) are reset;
+  // everything learned from actual ratings survives.
+  state.profile = {
+    ...existing,
+    name,
+    experience: quizProfile.experience,
+    dims: quizProfile.dims,
+    types: quizProfile.types,
+    adventure: quizProfile.adventure,
+    budget: quizProfile.budget,
+    nos: quizProfile.nos,
+    onboarded: true,
+  };
   SommProfile.saveProfile(state.profile);
 
   const wrap = $("#quiz");
@@ -231,9 +296,13 @@ function switchTab(tab) {
 
 // ============================== WINE CARDS ==============================
 function localCard(wine) {
+  // Convert EUR-based price endpoints to the user's display currency.
+  const cur = state.settings.currency;
+  const p0 = SommAI.convertFromEUR(wine.price[0], cur);
+  const p1 = SommAI.convertFromEUR(wine.price[1], cur);
   return {
     name: wine.name, region: wine.region, grape: wine.grape, type: wine.type,
-    price: `${state.settings.currency}${wine.price[0]}–${wine.price[1]}`,
+    price: `${cur}${p0}–${p1}`,
     match: SommProfile.matchPct(state.profile, wine),
     why: wine.desc, attrs: wine.attrs, _local: true,
   };
@@ -250,6 +319,7 @@ function wineCardEl(card, context) {
     </div>
     <div class="wc-name">${esc(card.name)}</div>
     <div class="wc-meta">${esc([card.grape, card.region].filter(Boolean).join(" · "))}${card.price ? ` · <strong>${esc(card.price)}</strong>` : ""}</div>
+    <a class="wc-buy" href="https://www.wine-searcher.com/find/${encodeURIComponent(card.name)}" target="_blank" rel="noopener noreferrer">Find online →</a>
     ${card.why ? `<div class="wc-why">${esc(card.why)}</div>` : ""}
     ${card.pairing ? `<div class="wc-pair">🍽 ${esc(card.pairing)}</div>` : ""}
     <div class="wc-actions">
@@ -310,7 +380,10 @@ function onTonightSubmit(e) {
 function runTonight(text, surprise) {
   const wrap = $("#tonight-results");
   const tags = surprise ? [] : SommProfile.extractFoodTags(text);
-  const recs = SommProfile.recommend(state.profile, { n: 3, foodTags: tags, budget: state.profile.budget.store });
+  const recs = SommProfile.recommend(state.profile, {
+    n: 3, foodTags: tags, budget: state.profile.budget.store,
+    fxRates: SommAI.getFxRates(), currency: state.settings.currency,
+  });
   wrap.innerHTML = "";
 
   const intro = document.createElement("div");
@@ -337,12 +410,25 @@ function runTonight(text, surprise) {
 function runStorePicks() {
   const wrap = $("#tonight-results");
   wrap.innerHTML = "";
-  const recs = SommProfile.recommend(state.profile, { n: 3, budget: state.profile.budget.store });
+  const recs = SommProfile.recommend(state.profile, {
+    n: 3, budget: state.profile.budget.store,
+    fxRates: SommAI.getFxRates(), currency: state.settings.currency,
+  });
   const intro = document.createElement("div");
   intro.className = "vera-line";
   intro.innerHTML = `<div class="vera-avatar sm">V</div><div class="vera-bubble">Your shopping shortlist — styles to grab in your budget (${state.settings.currency}${state.profile.budget.store[0]}–${state.profile.budget.store[1]}):</div>`;
   wrap.appendChild(intro);
   recs.forEach(({ wine, score }) => wrap.appendChild(wineCardEl(localCard(wine, score), "store list")));
+
+  const ask = document.createElement("button");
+  ask.className = "btn btn-outline btn-block";
+  ask.textContent = "Ask Vera to go deeper →";
+  ask.addEventListener("click", () => {
+    state.chatMode = "store";
+    switchTab("vera");
+    sendToVera(`Shopping list — my budget is ${state.settings.currency}${state.profile.budget.store[0]}–${state.profile.budget.store[1]}. Which of these styles should I prioritise and why?`);
+  });
+  wrap.appendChild(ask);
 }
 
 // ============================== SCAN ==============================
@@ -388,7 +474,10 @@ async function runScanAnalysis(img, mode) {
         { type: "text", text: userText },
       ],
     }];
-    const res = await SommAI.callAI({ messages, system, provider: "claude", model: "claude-opus-4-8", maxTokens: 2000 });
+    const res = await SommAI.callAI({
+      messages, system, provider: "claude", model: "claude-opus-4-8", maxTokens: 2000,
+      authToken: SommAuth.getUser() ? await SommAuth.getAccessToken() : null,
+    });
     const result = SommAI.parseScanResult(res.text);
     if (!result) throw new Error("Vera couldn't structure the analysis. Try a clearer photo or use chat.");
     showScanResultScreen(img, mode, result);
@@ -426,6 +515,11 @@ function showScanResultScreen(img, mode, result) {
   }
 
   if (result.error) {
+    // The shared anon per-IP budget can be exhausted by several beta testers on the same
+    // wifi hitting the same daily cap — nudge sign-in (which gets its own, larger, per-account
+    // budget) rather than leaving people to assume the app itself is broken.
+    const isBudgetErr = /budget/i.test(result.error);
+    const showSignIn = isBudgetErr && !SommAuth.getUser();
     screen.innerHTML = `
       <div class="sr-wrap">
         <div class="sr-topbar">
@@ -438,6 +532,7 @@ function showScanResultScreen(img, mode, result) {
             <div class="vera-avatar">V</div>
             <div>
               <p>${esc(result.error)}</p>
+              ${showSignIn ? `<button class="btn btn-primary" style="margin-top:10px" id="sr-signin-fb">Sign in for your own budget →</button>` : ""}
               <button class="btn btn-outline" style="margin-top:10px" id="sr-chat-fb">Try in chat instead →</button>
             </div>
           </div>
@@ -445,6 +540,7 @@ function showScanResultScreen(img, mode, result) {
       </div>`;
     $("#sr-back").addEventListener("click", hideScanResultScreen);
     $("#sr-chat-fb").addEventListener("click", () => openScanInChat(img, mode));
+    if (showSignIn) $("#sr-signin-fb").addEventListener("click", showAuthModal);
     return;
   }
 
@@ -486,15 +582,16 @@ function srPickCard(pick, context) {
 
   el.innerHTML = `
     <div class="sr-pick-head">
-      <span class="sr-rank">#${pick.rank}</span>
+      <span class="sr-rank">#${esc(String(Number(pick.rank) || 0))}</span>
       <span class="wc-type ${typeClass}">${esc((SommProfile.TYPE_LABELS[pick.type] || pick.type || "wine").toUpperCase())}</span>
-      <span class="sr-match-pct">${pick.match}% match</span>
+      <span class="sr-match-pct">${esc(String(Number(pick.match) || 0))}% match</span>
     </div>
     <div class="sr-pick-name">${esc(pick.name)}</div>
+    <a class="wc-buy" href="https://www.wine-searcher.com/find/${encodeURIComponent(pick.name)}" target="_blank" rel="noopener noreferrer">Find online →</a>
     <div class="sr-pick-meta">${esc(metaParts.join(" · "))}${pick.label_price ? ` · <strong>${esc(pick.label_price)}</strong>` : ""}</div>
     ${pick.shelf_position ? `<div class="sr-position">📍 ${esc(pick.shelf_position)}</div>` : ""}
     ${pick.match_reason ? `<div class="sr-why">✓ ${esc(pick.match_reason)}</div>` : ""}
-    ${pick.price_verdict ? `<span class="sr-price ${priceClass}">${esc(pick.price_verdict)}</span>` : ""}
+    ${pick.price_verdict ? `<div class="sr-price-row"><span class="sr-price ${priceClass}">${esc(pick.price_verdict)}</span><span class="sr-price-caveat" title="AI estimate from training knowledge — not a live price lookup">not a live price check</span></div>` : ""}
     ${pick.market_price_note ? `<div class="sr-market-note">🔍 ${esc(pick.market_price_note)}</div>` : ""}
     ${pick.pairing ? `<div class="wc-pair">🍽 ${esc(pick.pairing)}</div>` : ""}
     <div class="wc-actions">
@@ -534,14 +631,46 @@ function openScanInChat(img, mode, topPick) {
 }
 
 // ============================== VERA CHAT ==============================
+function chatStarters() {
+  const cur = state.settings.currency;
+  const p = state.profile;
+  const prefersRed = (p.types.red || 0) >= (p.types.white || 0);
+  return prefersRed ? [
+    "What should I open with pasta tonight?",
+    `Find me a Malbec under ${cur}20`,
+    "Surprise me — I trust you",
+    "What red pairs with lamb?",
+  ] : [
+    "What should I open with fish tonight?",
+    `Find me a crisp white under ${cur}20`,
+    "Surprise me — I trust you",
+    "What white pairs with seafood?",
+  ];
+}
+
 function renderChat() {
   const wrap = $("#chat-scroll");
   wrap.innerHTML = "";
   if (!state.chat.length) {
     const hello = document.createElement("div");
     hello.className = "msg assistant";
-    hello.innerHTML = `<div class="vera-avatar sm">V</div><div class="bubble">Hey${state.profile.name ? " " + esc(state.profile.name) : ""}. Ask me anything — what to open, what to buy, what to order. Or snap a photo from the Scan tab.</div>`;
+    hello.innerHTML = `<div class="vera-avatar sm">V</div><div class="bubble">Hey${state.profile.name ? " " + esc(state.profile.name) : ""}. Ask me anything about wine — what to open, what to buy, what to order. Or snap a photo from the Scan tab.</div>`;
     wrap.appendChild(hello);
+
+    // Conversation starter chips — profile-aware (red vs white skew)
+    const starters = document.createElement("div");
+    starters.className = "chat-starters";
+    chatStarters().forEach((prompt) => {
+      const btn = document.createElement("button");
+      btn.className = "chat-starter-btn";
+      btn.textContent = prompt;
+      btn.addEventListener("click", () => {
+        starters.remove();
+        sendToVera(prompt);
+      });
+      starters.appendChild(btn);
+    });
+    wrap.appendChild(starters);
   }
   state.chat.forEach((m) => wrap.appendChild(msgEl(m)));
   // mode chips
@@ -605,6 +734,23 @@ async function sendToVera(text, image) {
   $("#chat-scroll").appendChild(typing);
   scrollChat();
   state.busy = true;
+  $("#chat-input").disabled = true;
+  $("#chat-form").querySelector("button[type=submit]").disabled = true;
+
+  // After 4 s, show a reassuring note so users don't think it's broken.
+  const THINKING_MSGS = [
+    "Checking your palate profile…",
+    "Almost there — Vera thinks carefully…",
+    "Pulling from the cellar…",
+  ];
+  let thinkIdx = 0;
+  const thinkTimer = setTimeout(() => {
+    const bubble = typing.querySelector(".bubble");
+    if (bubble) {
+      bubble.innerHTML = `<span class="tdot"></span><span class="tdot"></span><span class="tdot"></span> <span class="typing-note">${esc(THINKING_MSGS[thinkIdx])}</span>`;
+      thinkIdx = (thinkIdx + 1) % THINKING_MSGS.length;
+    }
+  }, 4000);
 
   try {
     // Build API messages from recent history (text-only for old turns).
@@ -624,12 +770,16 @@ async function sendToVera(text, image) {
     });
 
     const system = SommAI.buildSystemPrompt(state.profile, state.chatMode, state.settings.currency);
+    // Vision needs Opus; plain-text chat turns run on the cheaper Sonnet tier — same
+    // approach for both abuse-cost control and everyday margin, since most chat turns
+    // never touch an image. See backend/server.js for the matching per-day token budget.
     const res = await SommAI.callAI({
       messages: apiMessages,
       system,
       provider: "claude",
-      model: "claude-opus-4-8",
+      model: image ? "claude-opus-4-8" : "claude-sonnet-5",
       maxTokens: 1500,
+      authToken: SommAuth.getUser() ? await SommAuth.getAccessToken() : null,
     });
     const { prose, cards } = SommAI.parseWineCards(res.text);
     state.chat.push({ role: "assistant", text: prose, cards });
@@ -637,6 +787,10 @@ async function sendToVera(text, image) {
   } catch (err) {
     state.chat.push({ role: "assistant", text: `⚠️ ${err.message}` });
   } finally {
+    clearTimeout(thinkTimer);
+    $("#chat-input").disabled = false;
+    $("#chat-form").querySelector("button[type=submit]").disabled = false;
+    $("#chat-input").focus();
     state.busy = false;
     saveChat();
     renderChat();
@@ -696,10 +850,12 @@ function renderYou() {
           <div class="user-email">${esc(user.email || "")}</div>
         </div>
         <button class="btn-ghost" id="you-signout">Sign out</button>
-      </div>`
+      </div>
+      <p class="privacy-note">Synced to the cloud: your chat history, ratings and taste profile. Stored in Supabase, tied to this account, kept until you delete it below.</p>`
     : `<div class="signin-nudge">
-        <p>Sign in to sync your palate across devices and contribute to crowd discovery.</p>
+        <p>Sign in to remember your palate across devices — your ratings and preferences travel with you.</p>
         <button class="btn btn-primary" id="you-signin">Sign in / Create account</button>
+        <p class="privacy-note">Signing in stores your chat history, ratings and taste profile in our cloud database (Supabase) indefinitely, tied to your account, so they can sync across devices. Nothing is shared or sold, and you can delete it anytime from this tab once signed in.</p>
       </div>`;
 
   wrap.innerHTML = authSection + `
@@ -717,7 +873,7 @@ function renderYou() {
       <h3>Palate</h3>
       ${dimBars}
       <div class="type-chips">${typeChips}</div>
-      ${lovedGrapes.length ? `<p class="muted">Loves: ${lovedGrapes.map(([g]) => esc(g)).join(", ")}</p>` : ""}
+      ${lovedGrapes.length ? `<p class="muted">Loves: ${lovedGrapes.map(([g]) => esc(g.replace(/_/g, " "))).join(", ")}</p>` : ""}
       ${p.nos.length ? `<p class="muted">Hard nos: ${p.nos.map(esc).join(", ")}</p>` : ""}
     </section>
 
@@ -753,6 +909,7 @@ function renderYou() {
     <section class="panel danger-zone">
       <button class="btn-ghost" id="p-export">Export profile</button>
       <button class="btn-ghost" id="p-redo">Redo onboarding</button>
+      ${user ? `<button class="btn-ghost danger" id="p-delete-cloud">Delete my cloud data</button>` : ""}
       <button class="btn-ghost danger" id="p-reset">Reset everything</button>
     </section>`;
 
@@ -776,7 +933,7 @@ function renderYou() {
     URL.revokeObjectURL(a.href);
   });
   $("#p-redo").addEventListener("click", () => {
-    if (confirm("Redo the onboarding quiz? Your journal and ratings are kept.")) {
+    if (confirm("Redo the onboarding quiz? This resets your quiz-based taste dimensions and budget — your journal, ratings and everything Vera has learned from them are kept.")) {
       state.profile.onboarded = false;
       showOnboarding();
     }
@@ -795,6 +952,24 @@ function renderYou() {
       await SommAuth.signOut();
       toast("Signed out");
     });
+    const deleteBtn = $("#p-delete-cloud");
+    if (deleteBtn) deleteBtn.addEventListener("click", async () => {
+      if (!confirm("Permanently delete your ratings, chat history and taste profile from our servers, sign you out, and reset this device? This can't be undone. (Your sign-in account itself is not deleted — you can create a fresh profile with the same email.)")) return;
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = "Deleting…";
+      const result = await SommDB.deleteMyData();
+      if (!result.ok) {
+        toast("Couldn't delete cloud data: " + (result.error || "unknown error"));
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = "Delete my cloud data";
+        return;
+      }
+      await SommAuth.signOut();
+      localStorage.removeItem(PROFILE_KEY);
+      localStorage.removeItem(CHAT_KEY);
+      localStorage.removeItem(SETTINGS_KEY);
+      location.reload();
+    });
   } else {
     $("#you-signin").addEventListener("click", () => showAuthModal());
   }
@@ -804,8 +979,22 @@ function renderYou() {
 function showAuthModal() { $("#auth-modal").hidden = false; }
 function hideAuthModal() { $("#auth-modal").hidden = true; }
 
+// Switches which sub-view of the auth modal is visible: "signin" (sign in/up form),
+// "forgot" (request a reset email), "sent" (confirmation), or "newpw" (set a new password,
+// reached via the emailed recovery link — see onAuthStateChange's PASSWORD_RECOVERY handler).
+function setAuthView(view) {
+  $("#auth-tab-row").hidden = view !== "signin";
+  $("#auth-form").hidden = view !== "signin";
+  $("#auth-forgot-link").hidden = view !== "signin";
+  $("#auth-oauth-block").hidden = view !== "signin";
+  $("#auth-forgot-view").hidden = view !== "forgot";
+  $("#auth-forgot-sent").hidden = view !== "sent";
+  $("#auth-newpw-view").hidden = view !== "newpw";
+}
+
 function bindAuthModal() {
   let mode = "signin";
+  setAuthView("signin");
 
   function setMode(m) {
     mode = m;
@@ -850,6 +1039,63 @@ function bindAuthModal() {
     } finally {
       btn.disabled = false;
       btn.textContent = mode === "signin" ? "Sign in" : "Create account";
+    }
+  });
+
+  // ---- Forgot password ----
+  $("#auth-forgot-link").addEventListener("click", () => {
+    $("#auth-forgot-email").value = $("#auth-email").value.trim();
+    setAuthView("forgot");
+  });
+  $("#auth-forgot-back").addEventListener("click", () => setAuthView("signin"));
+  $("#auth-forgot-done").addEventListener("click", () => setAuthView("signin"));
+
+  $("#auth-forgot-submit").addEventListener("click", async () => {
+    const email = $("#auth-forgot-email").value.trim();
+    const errEl = $("#auth-forgot-error");
+    errEl.hidden = true;
+    if (!email) { errEl.textContent = "Enter your email first."; errEl.hidden = false; return; }
+    const btn = $("#auth-forgot-submit");
+    btn.disabled = true;
+    btn.textContent = "Sending…";
+    try {
+      await SommAuth.resetPasswordForEmail(email);
+      $("#auth-forgot-sent-email").textContent = email;
+      setAuthView("sent");
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.hidden = false;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Send reset link";
+    }
+  });
+
+  // ---- Set new password (reached from the emailed recovery link) ----
+  $("#auth-newpw-submit").addEventListener("click", async () => {
+    const pw = $("#auth-newpw").value;
+    const errEl = $("#auth-newpw-error");
+    errEl.hidden = true;
+    if (!pw || pw.length < 6) {
+      errEl.textContent = "Password must be at least 6 characters.";
+      errEl.hidden = false;
+      return;
+    }
+    const btn = $("#auth-newpw-submit");
+    btn.disabled = true;
+    btn.textContent = "Updating…";
+    try {
+      await SommAuth.updatePassword(pw);
+      toast("Password updated ✓");
+      $("#auth-newpw").value = "";
+      hideAuthModal();
+      setAuthView("signin");
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.hidden = false;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Update password";
     }
   });
 }

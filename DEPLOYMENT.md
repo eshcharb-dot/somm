@@ -14,7 +14,30 @@ Backend Server (Express)
 Claude / Groq API (your paid key, kept secret)
 ```
 
-## Option 1: Deploy to Vercel (Recommended — free tier works)
+## Auto-deploy (recommended — keeps production from drifting behind the repo)
+
+`.github/workflows/deploy-backend.yml` deploys `backend/` to Vercel automatically on every push
+to `main` that touches `backend/`: it runs the backend test suite as a pre-deploy gate, deploys,
+then runs `backend/scripts/smoke-test.js` against the **live** deployment (checks that a request
+with no shared token is rejected 403/503, and that a cross-origin CORS preflight is blocked) —
+so a stale or misconfigured deploy fails the workflow loudly instead of silently running in
+production for weeks (which is what happened before this existed).
+
+One-time setup:
+
+1. `cd backend && vercel link` (creates `backend/.vercel/project.json` — not committed, see
+   `.gitignore`) and note the `orgId`/`projectId` it prints.
+2. In the GitHub repo, add these under **Settings → Secrets and variables → Actions**:
+   - `VERCEL_TOKEN` — from https://vercel.com/account/tokens
+   - `VERCEL_ORG_ID` — from step 1
+   - `VERCEL_PROJECT_ID` — from step 1
+3. Set the backend env vars (below) directly in the Vercel project dashboard — they're never
+   read from the repo/CI.
+
+After that, every push to `main` touching `backend/` redeploys automatically. You can also
+trigger it manually from the Actions tab (`workflow_dispatch`).
+
+## Option 1: Manual deploy to Vercel (initial setup, or if you're not using the GitHub Action)
 
 Vercel handles Node.js backends and free tier has enough capacity for a small app.
 
@@ -106,6 +129,19 @@ Then in frontend, `BACKEND_URL` is already `http://localhost:3000`.
 3. Go to Vera tab → ask a question
 4. Check backend logs for requests (no API key exposed)
 
+### Automated tests
+
+- `cd backend && npm test` — runs the cost-control test suite (`backend/test/`): rate
+  limiting, daily token budgets, and Supabase JWT verification, including the in-memory,
+  Upstash-backed, and fail-closed-serverless code paths, plus an integration check of
+  `/api/ai`'s fail-closed behavior over real HTTP.
+- `node --test "src/js/__tests__/*.test.js"` — the frontend suite (27 tests: quiz→profile
+  logic, rating learning, wine-card/scan-result parsing).
+- Both run in CI on every push/PR via `.github/workflows/ci.yml`.
+- `node backend/scripts/smoke-test.js <url>` — post-deploy smoke test against a **live**
+  backend URL (used automatically by `deploy-backend.yml`, see above): confirms a request
+  without the shared token is rejected and that cross-origin CORS is blocked.
+
 ## Security Notes
 
 - **API keys are NEVER sent to the frontend** — only the backend has them
@@ -152,6 +188,10 @@ Then in frontend, `BACKEND_URL` is already `http://localhost:3000`.
 
 - [x] Redis-based rate limiting (Upstash, required in production — see Security Notes)
 - [x] Per-user/day token budget, scoped by verified Supabase session JWT when present
+- [x] Git-based auto-deploy + post-deploy smoke test (see "Auto-deploy" above) so a stale/
+      insecure deployment can't silently persist
+- [x] Automated test coverage for the cost-control logic (rate limit / daily budget / JWT
+      verification), wired into CI alongside the frontend suite
 - [ ] Full backend enforcement that EVERY request carries a verified Supabase JWT (currently
       the JWT strengthens the abuse budget when present; anonymous/guest use is still
       allowed via the shared `SOMM_TOKEN`, matching the app's guest-mode UX)

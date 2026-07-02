@@ -1,0 +1,63 @@
+name: Deploy Backend
+
+# Git-based auto-deploy for backend/ — closes the "deploy drift" gap where the beta-hardening
+# server.js (fail-closed on missing SOMM_TOKEN/Upstash, CORS lock, rate limiting) could sit in
+# the repo for weeks without ever reaching production, because nothing actually redeployed on
+# push. Every push to main that touches backend/ now: runs the cost-control test suite as a
+# pre-deploy gate, deploys to Vercel, then smoke-tests the LIVE deployment — so a stale or
+# misconfigured deploy fails this workflow loudly instead of silently persisting.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   VERCEL_TOKEN       — https://vercel.com/account/tokens
+#   VERCEL_ORG_ID       — from `vercel project ls` / project Settings → General, or run
+#   VERCEL_PROJECT_ID   — `vercel link` once locally from backend/ and read .vercel/project.json
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - run: npm test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+      - name: Pull Vercel project settings
+        run: vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Build
+        run: vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+      - name: Deploy to Vercel (production)
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}")
+          echo "Deployed to $url"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+      - name: Smoke test the live deployment
+        run: node scripts/smoke-test.js "${{ steps.deploy.outputs.url }}"

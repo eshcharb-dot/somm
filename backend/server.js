@@ -291,9 +291,18 @@ async function callGroq(messages, system, model, maxTokens) {
 // Health check
 app.get("/health", (req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
 
-// Start server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🍷 Somm AI backend running on port ${PORT}`);
-  console.log(`Provider: ${CLAUDE_KEY ? "Claude" : GROQ_KEY ? "Groq" : "NONE (configure env vars)"}`);
-});
+// Start server — skipped when this file is `require()`d instead of run directly (e.g. by the
+// test suite in test/), so tests can exercise `app` and the cost-control functions below
+// without also binding a port / double-listening.
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`🍷 Somm AI backend running on port ${PORT}`);
+    console.log(`Provider: ${CLAUDE_KEY ? "Claude" : GROQ_KEY ? "Groq" : "NONE (configure env vars)"}`);
+  });
+}
+
+// Exported for the test suite (test/server.test.js) — covers the cost-control logic most
+// directly responsible for preventing a runaway API bill: checkRateLimit, checkDailyBudget,
+// verifySupabaseUser.
+module.exports = { app, checkRateLimit, checkDailyBudget, verifySupabaseUser, REQUESTS_PER_MINUTE };

@@ -63,10 +63,20 @@ backend/
 ## Dev
 
 ```powershell
-# run tests
+# frontend tests (27 tests: profile/quiz logic, wine-card & scan-result parsing)
+node --test "src/js/__tests__/*.test.js"
+
+# backend tests (cost-control logic: rate limiting, daily budgets, JWT verification)
+cd backend; npm test
+
+# quick syntax check
 node --check src/js/*.js
 dev-browser --headless run output/browser-test.js
 dev-browser --headless run output/pairing-test.js
 ```
+
+Both suites run automatically in CI on every push/PR (`.github/workflows/ci.yml`), and
+`backend/` auto-deploys with a post-deploy smoke test on every push to `main`
+(`.github/workflows/deploy-backend.yml` — see [DEPLOYMENT.md](DEPLOYMENT.md)).
 
 Deployed via GitHub Pages from the `gh-pages` branch (`git subtree push --prefix src origin gh-pages`).

@@ -1,0 +1,38 @@
+name: CI
+
+# Runs the whole automated test suite on every push/PR — frontend (27 tests over profile/ai
+# parsing logic) and backend (cost-control logic: rate limiting, daily budgets, Supabase JWT
+# verification). Wiring these into CI closes the gap where both suites existed but weren't
+# actually run anywhere, so a regression in the cost-control logic could reach production
+# unnoticed.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  frontend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Run frontend test suite
+        run: node --test "src/js/__tests__/*.test.js"
+
+  backend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install backend dependencies
+        run: npm ci
+      - name: Run backend test suite
+        run: npm test

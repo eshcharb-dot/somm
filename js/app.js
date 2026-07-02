@@ -1009,13 +1009,13 @@ function renderYou() {
 
     <section class="panel">
       <h3>Budget <span class="muted">(per bottle)</span></h3>
-      <div class="budget-row"><label>Store</label>
-        <input type="number" id="b-store-min" value="${p.budget.store[0]}" min="1"> –
-        <input type="number" id="b-store-max" value="${p.budget.store[1]}" min="1">
+      <div class="budget-row"><label id="b-store-label">Store</label>
+        <input type="number" id="b-store-min" value="${p.budget.store[0]}" min="1" aria-label="Store budget minimum" aria-describedby="b-store-label"> –
+        <input type="number" id="b-store-max" value="${p.budget.store[1]}" min="1" aria-label="Store budget maximum" aria-describedby="b-store-label">
       </div>
-      <div class="budget-row"><label>Restaurant</label>
-        <input type="number" id="b-rest-min" value="${p.budget.restaurant[0]}" min="1"> –
-        <input type="number" id="b-rest-max" value="${p.budget.restaurant[1]}" min="1">
+      <div class="budget-row"><label id="b-rest-label">Restaurant</label>
+        <input type="number" id="b-rest-min" value="${p.budget.restaurant[0]}" min="1" aria-label="Restaurant budget minimum" aria-describedby="b-rest-label"> –
+        <input type="number" id="b-rest-max" value="${p.budget.restaurant[1]}" min="1" aria-label="Restaurant budget maximum" aria-describedby="b-rest-label">
       </div>
       <button class="btn btn-outline" id="b-save">Save budget</button>
     </section>
@@ -1028,7 +1028,7 @@ function renderYou() {
     <section class="panel">
       <h3>Settings</h3>
       <label class="field-label">Currency</label>
-      <select id="set-currency" class="input">
+      <select id="set-currency" class="input" aria-label="Currency">
         ${["€", "$", "£", "₪"].map((c) => `<option ${state.settings.currency === c ? "selected" : ""}>${c}</option>`).join("")}
       </select>
       <button class="btn btn-primary" id="set-save">Save settings</button>

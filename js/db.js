@@ -92,4 +92,22 @@ async function deleteMyData() {
   }
 }
 
-const SommDB = { saveRating, saveMessage, saveProfile, getProfile, getCrowdFavorites, deleteMyData };
+// Write-only error visibility (round 5 finding: no monitoring existed, failures on beta
+// testers' own devices were invisible beyond a toast they'd dismiss). Fire-and-forget by
+// design — logging a failure must never itself throw or block the UI. Works for guests too
+// (user_id is null); RLS only allows INSERT, so this can't be abused to read other reports.
+async function logError(source, context, err) {
+  try {
+    const user = SommAuth.getUser();
+    await SommAuth.client().from("error_reports").insert({
+      user_id: user ? user.id : null,
+      source,
+      context: context || null,
+      message: String((err && err.message) || err || "unknown error").slice(0, 2000),
+      stack: err && err.stack ? String(err.stack).slice(0, 4000) : null,
+      url: typeof location !== "undefined" ? location.href : null,
+    });
+  } catch (e) { /* never let error logging itself break the app */ }
+}
+
+const SommDB = { saveRating, saveMessage, saveProfile, getProfile, getCrowdFavorites, deleteMyData, logError };

@@ -53,12 +53,22 @@ function saveProfile(p) {
   localStorage.setItem(PROFILE_KEY, JSON.stringify(p));
 }
 
+// Best-effort locale -> currency-symbol guess, limited to the symbols the app actually
+// supports (see SommAI.convertFromEUR's sym2code map). Falls back to € on any failure or
+// unrecognized region, matching the app's original hardcoded default.
+function guessCurrencySymbol() {
+  try {
+    const region = new Intl.Locale(navigator.language || "en-US").maximize().region;
+    return { US: "$", GB: "£", IL: "₪" }[region] || "€";
+  } catch (e) { return "€"; }
+}
+
 function loadSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) return JSON.parse(raw);
   } catch (e) { /* fall through */ }
-  return { currency: "€" };
+  return { currency: guessCurrencySymbol() };
 }
 
 function saveSettings(s) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }

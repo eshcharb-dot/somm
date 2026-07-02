@@ -204,14 +204,6 @@ select.input { appearance: none; }
 .scan-tile:active { transform: scale(.97); }
 .scan-ico { font-size: 1.7rem; margin-bottom: 4px; }
 .scan-tile span:last-child { color: var(--muted); font-size: .84rem; }
-.cheatsheet { margin-top: 18px; display: flex; flex-direction: column; gap: 9px; }
-.cheat-row {
-  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-  padding: 11px 14px; display: flex; flex-direction: column; gap: 2px;
-}
-.cheat-row strong { color: var(--gold-soft); }
-.cheat-row span { color: var(--cream-dim); font-size: .9rem; }
-
 /* ---------- chat ---------- */
 #tab-vera { overflow: hidden; }
 #tab-vera[hidden] { display: none; }
@@ -552,7 +544,10 @@ p.privacy-note {
    claim in the app, so the "not verified" disclosure must be readable at a glance on
    phones, not hidden behind a title="" tooltip that touch users can't discover. */
 .sr-price-caveat {
-  font-size: .68rem; font-style: italic; color: var(--muted); opacity: .85;
+  /* Was .68rem/--muted — round 5 beta review found this too small/low-contrast to actually
+     read on a phone despite being real text (not just a title="" tooltip). Bumped to match
+     body-copy legibility while staying visually secondary via italic + softer color. */
+  font-size: .82rem; font-style: italic; color: var(--cream-dim); opacity: .9;
 }
 .sr-market-note {
   font-size: .84rem; color: var(--muted); margin-bottom: 8px;

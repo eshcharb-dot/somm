@@ -62,6 +62,16 @@ function saveChat() {
 }
 
 // ============================== BOOT ==============================
+// Catch-all visibility net for anything not already logged at its call site (see
+// SommDB.logError call sites in scan/chat error handling above) — e.g. render-time
+// exceptions in an onclick handler. Fire-and-forget, never blocks or alters behavior.
+window.addEventListener("error", (e) => {
+  SommDB.logError("client", "window.onerror", e.error || e.message);
+});
+window.addEventListener("unhandledrejection", (e) => {
+  SommDB.logError("client", "unhandledrejection", e.reason);
+});
+
 document.addEventListener("DOMContentLoaded", async () => {
   loadChat();
   SommAI.initFxRates(); // non-blocking — rates cached for prompt injection
@@ -322,7 +332,6 @@ function switchTab(tab) {
   $$(".tab").forEach((t) => { t.hidden = t.id !== "tab-" + tab; });
   if (tab === "you") renderYou();
   if (tab === "vera") { renderChat(); $("#chat-scroll").scrollTop = $("#chat-scroll").scrollHeight; }
-  if (tab === "scan") renderScanHint();
   if (tab === "tonight") renderTonightGreeting();
 }
 
@@ -464,11 +473,6 @@ function runStorePicks() {
 }
 
 // ============================== SCAN ==============================
-function renderScanHint() {
-  $("#scan-nokey").hidden = true;
-  $("#scan-ready").hidden = false;
-}
-
 function scanWith(mode) {
   state.pendingScanMode = mode;
   $("#scan-input").click();
@@ -514,6 +518,7 @@ async function runScanAnalysis(img, mode) {
     if (!result) throw new Error("Vera couldn't structure the analysis. Try a clearer photo or use chat.");
     showScanResultScreen(img, mode, result);
   } catch (err) {
+    SommDB.logError("client", `scan:${mode}`, err);
     showScanResultScreen(img, mode, { error: err.message || "Analysis failed — try again." });
   }
 }
@@ -844,6 +849,7 @@ async function requestVeraReply(text, image) {
     // rate/budget limits need the user to actually do something different (check connection,
     // wait), so only wire up "tap to retry" for the timeout case (see ai.js's AbortError copy).
     const isTimeout = /tap to try again/i.test(err.message);
+    SommDB.logError("client", `chat:${state.chatMode}`, err);
     state.chat.push({
       role: "assistant",
       text: `⚠️ ${err.message}`,

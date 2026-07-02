@@ -30,6 +30,16 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      - name: Stamp service worker cache with build SHA
+        # src/sw.js hardcoding a static CACHE_NAME meant the SW script's bytes never changed
+        # across deploys, so browsers never re-ran install/activate and already-installed
+        # users' cached app.js/ai.js/app.css never refreshed — shipped fixes silently never
+        # reached them. Replacing the placeholder with the commit SHA guarantees the file
+        # changes on every deploy. Fails loudly (grep -q) if the placeholder is ever removed
+        # from sw.js, instead of silently deploying an unversioned cache again.
+        run: |
+          grep -q '__BUILD_ID__' src/sw.js || { echo "::error::src/sw.js is missing the __BUILD_ID__ placeholder — cache versioning would silently stop working"; exit 1; }
+          sed -i "s/__BUILD_ID__/${GITHUB_SHA}/" src/sw.js
       - name: Deploy src/ to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:

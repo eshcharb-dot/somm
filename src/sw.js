@@ -1,7 +1,15 @@
 // Somm service worker — cache-first for static assets, network-first for API calls.
 "use strict";
 
-const CACHE_NAME = "somm-v1";
+// Stamped with the deploying commit's SHA by .github/workflows/deploy-frontend.yml before
+// publish (see the "Stamp service worker cache" step there). This file's bytes must change on
+// every deploy — the browser only re-runs install/activate (and therefore only re-fetches
+// app.js/ai.js/app.css etc. into the cache) when the SW script itself changed byte-for-byte.
+// A hardcoded constant here silently freezes already-installed users on whatever build was
+// live when they first installed the PWA, no matter how many fixes ship after that. If you
+// ever see the literal token below in production, the stamp step didn't run — treat that as a
+// deploy bug, not a working cache name.
+const CACHE_NAME = "somm-__BUILD_ID__";
 
 const STATIC_ASSETS = [
   "/somm/",

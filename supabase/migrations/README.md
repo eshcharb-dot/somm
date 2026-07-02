@@ -1,9 +1,9 @@
 # Supabase RLS migrations
 
 These files codify the Row Level Security policies every user-scoped table (`wine_ratings`,
-`chat_messages`, `profiles`) needs, since the client (`src/js/auth.js`, `src/js/db.js`)
-talks to Supabase directly with the public anon key — RLS is the only thing stopping one
-signed-in user from reading/writing another user's data through that same key.
+`chat_messages`, `profiles`, `feedback`) needs, since the client (`src/js/auth.js`,
+`src/js/db.js`) talks to Supabase directly with the public anon key — RLS is the only thing
+stopping one signed-in user from reading/writing another user's data through that same key.
 
 They were authored from the columns the app's client code actually writes (see the comments
 in each file), **not** pulled from a live introspection of the project, because the `somm`

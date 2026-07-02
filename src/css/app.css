@@ -191,6 +191,11 @@ select.input { appearance: none; }
 .wc-name { font-size: 1.3rem; line-height: 1.15; }
 .wc-meta { color: var(--muted); font-size: .88rem; margin-top: 2px; }
 .wc-meta strong { color: var(--ink-dim); }
+/* Same always-visible (not hover-only) caveat treatment as .sr-price-caveat — Tonight/store-
+   list/onboarding prices come from the same local price bands or AI training-knowledge
+   estimate as scan/chat prices, so they need the same "not a live lookup" honesty, not just a
+   title="" tooltip touch users can't discover. */
+.wc-price-caveat { font-size: .78rem; font-style: italic; color: var(--ink-dim); opacity: .9; margin-top: 1px; }
 .wc-buy { font-size: .8rem; color: var(--wine); text-decoration: none; display: inline-block; margin-top: 4px; font-weight: 600; }
 .wc-buy:hover { text-decoration: underline; }
 .wc-why { color: var(--ink-dim); font-size: .94rem; margin-top: 8px; }

@@ -37,6 +37,19 @@ One-time setup:
 After that, every push to `main` touching `backend/` redeploys automatically. You can also
 trigger it manually from the Actions tab (`workflow_dispatch`).
 
+`.github/workflows/deploy-frontend.yml` does the same for `src/`, and additionally stamps
+`src/sw.js`'s `CACHE_NAME` with the deploying commit SHA before publish (see the "Stamp service
+worker cache with build SHA" step). This is load-bearing: a service worker's bytes must change
+for the browser to re-run install/activate at all, so if `CACHE_NAME` ever stops changing on
+deploy, already-installed users silently freeze on old cached JS/CSS with no error and no way to
+tell. **CI checklist — if you ever touch `src/sw.js` or the deploy workflow:**
+- `CACHE_NAME` in `src/sw.js` must still contain the literal `__BUILD_ID__` placeholder (the
+  stamp step's `grep -q` guard fails the build if it's missing).
+- Don't reintroduce a hardcoded cache name — the whole point is that it changes every deploy
+  without a human remembering to bump it.
+- After deploying, confirm in devtools (Application → Service Workers) that a new SW installs
+  and the old cache is evicted, on a browser tab that already had the app installed pre-deploy.
+
 ## Option 1: Manual deploy to Vercel (initial setup, or if you're not using the GitHub Action)
 
 Vercel handles Node.js backends and free tier has enough capacity for a small app.

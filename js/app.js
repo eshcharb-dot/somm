@@ -13,6 +13,9 @@ const state = {
   quizAnswers: [],
   pendingImage: null,        // {b64, mediaType, dataUrl, scanMode}
   busy: false,
+  scanAbortToken: 0,         // bumped whenever the user backs out of an in-flight scan (see
+                              // runScanAnalysis/closeScanResultScreen) so a late-arriving
+                              // result doesn't reopen a screen the user already left.
 };
 
 const $ = (sel, el) => (el || document).querySelector(sel);
@@ -399,7 +402,8 @@ function wineCardEl(card, context) {
       <span class="wc-match" title="Estimated fit vs your taste profile — not a guarantee">${matchBadgeText(card.match)}</span>
     </div>
     <div class="wc-name">${esc(card.name)}</div>
-    <div class="wc-meta">${esc([card.grape, card.region].filter(Boolean).join(" · "))}${card.price ? ` · <strong>${esc(card.price)}</strong>` : ""}</div>
+    <div class="wc-meta">${esc([card.grape, card.region].filter(Boolean).join(" · "))}${card.price ? ` · <strong title="Estimate — not a live price lookup">${esc(card.price)}</strong>` : ""}</div>
+    ${card.price ? `<div class="wc-price-caveat">est., not a live price check</div>` : ""}
     <a class="wc-buy" href="https://www.wine-searcher.com/find/${encodeURIComponent(card.name)}" target="_blank" rel="noopener noreferrer">Find online →</a>
     ${card.why ? `<div class="wc-why">${esc(card.why)}</div>` : ""}
     ${card.pairing ? `<div class="wc-pair">🍽 ${esc(card.pairing)}</div>` : ""}
@@ -439,8 +443,13 @@ function renderTonightGreeting() {
     const pool = SOMM_DATA.WINES.filter((w) => SommProfile.wineAllowed(p, w));
     if (pool.length) {
       const day = Math.floor(Date.now() / 86400000);
+      // Rotate across a wide slice of the ranked pool, not just the top handful — narrowing
+      // to a small top-N means daily-active users cycle back to the same wines within a
+      // week or two even though the underlying pool is much bigger. 21 gives a 3-week cycle
+      // (or the whole pool, if it's smaller) while still favoring better matches over the
+      // long tail.
       const ranked = pool.map((w) => ({ w, m: SommProfile.matchPct(p, w) }))
-        .sort((a, b) => b.m - a.m).slice(0, 7);
+        .sort((a, b) => b.m - a.m).slice(0, Math.min(21, pool.length));
       const pick = ranked[day % ranked.length].w;
       const intro = document.createElement("div");
       intro.className = "vera-line";
@@ -533,6 +542,10 @@ async function onScanFile(e) {
 }
 
 async function runScanAnalysis(img, mode) {
+  // Snapshot the abort token for this run — if the user backs out of the loading screen before
+  // this resolves (see the loading-screen back button below), state.scanAbortToken changes and
+  // we drop the result on the floor instead of yanking them back into a screen they left.
+  const myToken = ++state.scanAbortToken;
   showScanResultScreen(img, mode, null); // loading state immediately
   try {
     await SommAI.initFxRates(); // ensure fresh rates before building prompt
@@ -556,11 +569,33 @@ async function runScanAnalysis(img, mode) {
     });
     const result = SommAI.parseScanResult(res.text);
     if (!result) throw new Error("Vera couldn't structure the analysis. Try a clearer photo or use chat.");
+    if (myToken !== state.scanAbortToken) return; // user backed out — let it resolve quietly
     showScanResultScreen(img, mode, result);
   } catch (err) {
     SommDB.logError("client", `scan:${mode}`, err);
+    if (myToken !== state.scanAbortToken) return;
     showScanResultScreen(img, mode, { error: err.message || "Analysis failed — try again." });
   }
+}
+
+const SCAN_NUDGE_KEY = "somm.scanNudge.v1";
+const SCAN_NUDGE_AT = 3;
+// Soft, early sign-in nudge — separate from the hard-wall prompt shown when the shared anon
+// budget is exhausted (see the isBudgetErr branch below). Waiting until that hard wall to ever
+// mention sign-in is a rough first impression for a brand-new user who just wanted one scan and
+// gets blocked by strangers on the same wifi. Firing once, after a few *successful* scans,
+// lets sign-in read as "keep this going" instead of "you're locked out." Guests only; fires
+// once ever (per device) via the `shown` flag.
+function shouldShowSignInNudge() {
+  if (SommAuth.getUser()) return false;
+  let s;
+  try { s = JSON.parse(localStorage.getItem(SCAN_NUDGE_KEY)) || {}; } catch (e) { s = {}; }
+  if (s.shown) return false;
+  s.count = (s.count || 0) + 1;
+  const fire = s.count >= SCAN_NUDGE_AT;
+  if (fire) s.shown = true;
+  localStorage.setItem(SCAN_NUDGE_KEY, JSON.stringify(s));
+  return fire;
 }
 
 function showScanResultScreen(img, mode, result) {
@@ -582,7 +617,10 @@ function showScanResultScreen(img, mode, result) {
     }[mode] || "Analyzing…";
     screen.innerHTML = `
       <div class="sr-loading">
-        <div class="sr-topbar"><span class="sr-mode-tag">${esc(modeLabel)}</span></div>
+        <div class="sr-topbar">
+          <button class="sr-back" id="sr-back">← Back</button>
+          <span class="sr-mode-tag">${esc(modeLabel)}</span>
+        </div>
         <img src="${img.dataUrl}" class="sr-photo" alt="Scanning">
         <div class="sr-loading-msg">
           <div class="vera-avatar">V</div>
@@ -593,6 +631,11 @@ function showScanResultScreen(img, mode, result) {
         </div>
         <div class="sr-spinner"></div>
       </div>`;
+    // Scanned the wrong thing? Bail without waiting out the up-to-~30s analysis. The in-flight
+    // fetch itself isn't aborted (no AbortController plumbed through SommAI.callAI), but
+    // runScanAnalysis checks scanAbortToken before acting on the result, so it resolves
+    // quietly in the background instead of yanking the user back into this screen.
+    $("#sr-back").addEventListener("click", closeScanResultScreen);
     return;
   }
 
@@ -616,6 +659,7 @@ function showScanResultScreen(img, mode, result) {
               <p>${esc(result.error)}</p>
               ${showSignIn ? `<button class="btn btn-primary" style="margin-top:10px" id="sr-signin-fb">Sign in for your own budget →</button>` : ""}
               <button class="btn btn-outline" style="margin-top:10px" id="sr-chat-fb">Try in chat instead →</button>
+              <button class="btn btn-ghost" style="margin-top:10px" id="sr-feedback-fb">Something off? Tell Vera</button>
             </div>
           </div>
         </div>
@@ -623,11 +667,18 @@ function showScanResultScreen(img, mode, result) {
     $("#sr-back").addEventListener("click", closeScanResultScreen);
     $("#sr-chat-fb").addEventListener("click", () => openScanInChat(img, mode));
     if (showSignIn) $("#sr-signin-fb").addEventListener("click", showAuthModal);
+    $("#sr-feedback-fb").addEventListener("click", async () => {
+      const msg = prompt("What went wrong? (a couple of words is plenty)");
+      if (!msg || !msg.trim()) return;
+      const fbResult = await SommDB.saveFeedback(msg.trim(), `scan-error:${mode}`);
+      toast(fbResult.ok ? "Thanks — got it ✓" : "Couldn't send that — try again in a bit");
+    });
     return;
   }
 
   const picks = result.picks || [];
   const picksHeading = { bottle: "The verdict", menu: "Wine pairings", list: "Best picks", shelf: "Grab these" }[mode] || "Your picks";
+  const showSignInNudge = shouldShowSignInNudge();
 
   screen.innerHTML = `
     <div class="sr-wrap">
@@ -644,11 +695,16 @@ function showScanResultScreen(img, mode, result) {
         ${picks.length ? `<h3 class="sr-picks-head">${esc(picksHeading)}</h3>` : ""}
         <div id="sr-picks-list"></div>
         <button class="btn btn-outline btn-block" id="sr-chat-cta">Ask Vera for more →</button>
+        ${showSignInNudge ? `<div class="signin-nudge" style="margin-top:14px">
+          <p>Liking Vera so far? Sign in to keep your taste profile and ratings across devices — and get your own daily usage budget instead of sharing one with everyone on this wifi.</p>
+          <button class="btn btn-primary" id="sr-signin-nudge">Sign in / Create account</button>
+        </div>` : ""}
       </div>
     </div>`;
 
   const picksWrap = $("#sr-picks-list");
   picks.forEach((pick) => picksWrap.appendChild(srPickCard(pick, mode)));
+  if (showSignInNudge) $("#sr-signin-nudge").addEventListener("click", showAuthModal);
 
   $("#sr-back").addEventListener("click", closeScanResultScreen);
   $("#sr-chat-cta").addEventListener("click", () => openScanInChat(img, mode, picks[0]));
@@ -697,6 +753,9 @@ function srPickCard(pick, context) {
 }
 
 function hideScanResultScreen() {
+  state.scanAbortToken++; // invalidate any scan still in flight — see runScanAnalysis. Bumped
+                           // here (not just in closeScanResultScreen) so this also covers the
+                           // Android hardware/gesture back button, which calls this directly.
   $("#screen-scan-result").hidden = true;
   // fromPopstate=true here too — this is just restoring the tab underneath the overlay, not a
   // real navigation, so it must not push another history entry (see switchTab/bindBackButton).
@@ -709,7 +768,7 @@ function hideScanResultScreen() {
 // entry, so we replace it (not push a new one) to keep the stack from growing on repeated opens.
 function closeScanResultScreen() {
   if ($("#screen-scan-result").hidden) return;
-  hideScanResultScreen();
+  hideScanResultScreen(); // also bumps scanAbortToken — see its comment
   if (history.state && history.state.sommOverlay === "scanresult") {
     history.replaceState({ sommTab: state.tab }, "");
   }
@@ -1036,6 +1095,16 @@ function renderYou() {
       <p class="muted small">No API keys needed — just chat and scan. All requests are private.</p>
     </section>
 
+    <section class="panel">
+      <h3>Something off?</h3>
+      <p class="muted small">Beta bug, bad rec, missing feature — tell us and we'll see it.</p>
+      <button class="btn btn-outline" id="you-feedback-btn">Tell Vera →</button>
+      <div id="you-feedback-form" hidden style="margin-top: 10px;">
+        <textarea id="you-feedback-text" class="input" rows="3" placeholder="What happened, or what would make this better?"></textarea>
+        <button class="btn btn-primary" id="you-feedback-send" style="margin-top: 8px;">Send feedback</button>
+      </div>
+    </section>
+
     <section class="panel danger-zone">
       <button class="btn-ghost" id="p-export">Export profile</button>
       <button class="btn-ghost" id="p-redo">Redo onboarding</button>
@@ -1054,6 +1123,28 @@ function renderYou() {
     state.settings.currency = $("#set-currency").value;
     SommProfile.saveSettings(state.settings);
     toast("Settings saved");
+  });
+  $("#you-feedback-btn").addEventListener("click", () => {
+    const form = $("#you-feedback-form");
+    form.hidden = !form.hidden;
+    if (!form.hidden) $("#you-feedback-text").focus();
+  });
+  $("#you-feedback-send").addEventListener("click", async () => {
+    const text = $("#you-feedback-text").value.trim();
+    if (!text) return;
+    const btn = $("#you-feedback-send");
+    btn.disabled = true;
+    btn.textContent = "Sending…";
+    const result = await SommDB.saveFeedback(text, "you-tab");
+    btn.disabled = false;
+    btn.textContent = "Send feedback";
+    if (result.ok) {
+      $("#you-feedback-text").value = "";
+      $("#you-feedback-form").hidden = true;
+      toast("Thanks — got it ✓");
+    } else {
+      toast("Couldn't send that — try again in a bit");
+    }
   });
   $("#p-export").addEventListener("click", () => {
     const blob = new Blob([JSON.stringify({ profile: p, settings: state.settings }, null, 2)], { type: "application/json" });

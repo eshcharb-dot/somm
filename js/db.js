@@ -110,4 +110,27 @@ async function logError(source, context, err) {
   } catch (e) { /* never let error logging itself break the app */ }
 }
 
-const SommDB = { saveRating, saveMessage, saveProfile, getProfile, getCrowdFavorites, deleteMyData, logError };
+// User-initiated "something's off / here's an idea" reports — distinct from logError (which
+// only captures crashes/exceptions the app noticed itself). This is the beta's primary channel
+// for testers to tell us about problems the app didn't detect on its own (bad recommendation,
+// confusing copy, missing feature, etc). Works for guests too (user_id null), same as
+// logError; RLS should only allow INSERT so this can't be abused to read other users' reports.
+async function saveFeedback(message, context) {
+  const trimmed = String(message || "").trim();
+  if (!trimmed) return { ok: false, error: "Empty feedback" };
+  try {
+    const user = SommAuth.getUser();
+    await SommAuth.client().from("feedback").insert({
+      user_id: user ? user.id : null,
+      message: trimmed.slice(0, 4000),
+      context: context || null,
+      url: typeof location !== "undefined" ? location.href : null,
+    });
+    return { ok: true };
+  } catch (e) {
+    console.warn("db.saveFeedback:", e.message);
+    return { ok: false, error: e.message };
+  }
+}
+
+const SommDB = { saveRating, saveMessage, saveProfile, getProfile, getCrowdFavorites, deleteMyData, logError, saveFeedback };

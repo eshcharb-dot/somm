@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy & Terms — Somm</title>
+<meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Karla:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #160b11; --panel: #201319; --line: #3d2433; --cream: #f3ead9; --cream-dim: #c9bba8; --muted: #94808a; --gold: #d4a73c; --gold-soft: #e8c97a; --wine: #6d1f38; --wine-bright: #8e2f4a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--cream-dim); font-family: "Karla", system-ui, sans-serif; line-height: 1.6; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 32px 20px 60px; }
+  h1 { font-family: "Fraunces", serif; font-weight: 500; font-style: italic; color: var(--cream); font-size: 2rem; margin: 0 0 4px; }
+  .updated { color: var(--muted); font-size: .85rem; margin: 0 0 28px; }
+  h2 { font-family: "Fraunces", serif; font-weight: 500; color: var(--cream); font-size: 1.2rem; margin: 28px 0 8px; }
+  p, li { font-size: .94rem; }
+  ul { padding-left: 20px; }
+  a { color: var(--gold); }
+  .back { display: inline-block; margin-bottom: 20px; color: var(--gold-soft); text-decoration: none; font-size: .9rem; }
+  .back:hover { text-decoration: underline; }
+  .age-note { border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 14px 16px; margin: 20px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="javascript:history.back()">← Back to Somm</a>
+  <h1>Privacy &amp; Terms</h1>
+  <p class="updated">Somm — a personal AI wine companion.</p>
+
+  <div class="age-note">
+    <strong>Legal drinking age.</strong> Somm recommends alcoholic beverages. It is intended only
+    for people of legal drinking age in their country/region. By using the app you confirm you
+    meet that requirement. Somm does not sell or serve alcohol — it only provides information
+    and recommendations.
+  </div>
+
+  <h2>What we collect</h2>
+  <ul>
+    <li><strong>On-device:</strong> your taste profile, ratings, budget preferences and chat
+      history are stored in your browser's local storage by default — no account required.</li>
+    <li><strong>If you sign in:</strong> the same data (chat history, ratings, taste profile) is
+      also stored in our cloud database (Supabase), tied to your account, so it can sync across
+      devices. Access is restricted to your account via row-level security.</li>
+    <li><strong>Photos:</strong> when you scan a bottle, shelf, wine list or menu, the photo is
+      sent to our backend and forwarded to Anthropic's Claude API for analysis. Photos are not
+      stored by Somm. Anthropic's own privacy policy applies to that processing.</li>
+    <li><strong>Chat messages:</strong> sent to our backend, which proxies them to Claude (or
+      Groq) to generate Vera's replies. Backend request logs may briefly contain message text
+      for debugging/abuse-prevention purposes.</li>
+  </ul>
+
+  <h2>What we don't do</h2>
+  <ul>
+    <li>We don't sell or share your data with third parties for advertising.</li>
+    <li>We don't require an account to use the core app — signing in is optional and only adds
+      cross-device sync.</li>
+  </ul>
+
+  <h2>Your controls</h2>
+  <ul>
+    <li><strong>Export</strong> your profile as JSON any time from the You tab.</li>
+    <li><strong>Reset</strong> everything stored locally on this device from the You tab.</li>
+    <li><strong>Delete your cloud data</strong> permanently (chat history, ratings, taste
+      profile) from the You tab if you're signed in. This does not delete your sign-in account
+      itself.</li>
+  </ul>
+
+  <h2>Terms</h2>
+  <p>Somm's recommendations are informational, not professional advice. Price and market
+  estimates come from the AI's training knowledge, not a live price feed, and may be inaccurate
+  — always verify before buying. Drink responsibly and in accordance with the laws where you
+  live.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about your data? Reach out via the project repository.</p>
+</div>
+</body>
+</html>

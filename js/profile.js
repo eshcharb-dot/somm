@@ -25,6 +25,7 @@ function defaultProfile() {
     created: new Date().toISOString(),
     updated: new Date().toISOString(),
     onboarded: false,
+    ageConfirmed: false,   // one-time "I'm of legal drinking age" checkbox on onboarding
     name: "",
     experience: "casual",
     dims: { body: .5, sweet: .25, acid: .55, tannin: .45, fruit: .55, oak: .35 },

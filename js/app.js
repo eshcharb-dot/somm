@@ -37,10 +37,14 @@ function loadChat() {
   catch (e) { state.chat = []; }
 }
 function saveChat() {
-  // Persist without heavy image data beyond the last 2 photos.
+  // Persist without heavy image data beyond the last 2 photos. Retry metadata (retryText/
+  // retryImage) is intentionally dropped — it's only meaningful for the live in-memory
+  // session; reloading the page loses the retry affordance, which is fine since the failed
+  // request is stale by then anyway.
   const slim = state.chat.slice(-40).map((m, i, arr) => {
-    if (m.dataUrl && i < arr.length - 4) return { ...m, dataUrl: null };
-    return m;
+    const { retry, retryText, retryImage, ...rest } = m;
+    if (m.dataUrl && i < arr.length - 4) return { ...rest, dataUrl: null };
+    return rest;
   });
   try {
     localStorage.setItem(CHAT_KEY, JSON.stringify(slim));
@@ -176,10 +180,23 @@ function renderQuizStep() {
           <div class="vera-bubble">Hi, I'm <strong>Vera</strong> — your personal sommelier. A few quick questions and I'll start recommending wines that actually fit <em>your</em> taste — not just the crowd favourites. No wine knowledge needed.</div>
         </div>
         <input id="onb-name" class="input" type="text" placeholder="What should I call you? (optional)" maxlength="24" autocomplete="given-name" />
-        <button class="btn btn-primary btn-block" id="onb-start">Let's go</button>
+        <label class="onb-agegate">
+          <input type="checkbox" id="onb-agegate">
+          <span>I confirm I'm of legal drinking age in my country</span>
+        </label>
+        <button class="btn btn-primary btn-block" id="onb-start" disabled>Let's go</button>
+        <p class="onb-legal"><a href="privacy.html" target="_blank" rel="noopener noreferrer">Privacy &amp; Terms</a></p>
       </div>`;
+    $("#onb-agegate").addEventListener("change", (e) => {
+      $("#onb-start").disabled = !e.target.checked;
+    });
     $("#onb-start").addEventListener("click", () => {
+      // Belt-and-suspenders: the button is disabled until checked, but don't rely on that
+      // alone — Somm's entire purpose is alcohol recommendations, so this confirmation must
+      // actually be recorded before onboarding proceeds.
+      if (!$("#onb-agegate").checked) return;
       state.profile.name = $("#onb-name").value.trim();
+      state.profile.ageConfirmed = true;
       state.quizStep = 0;
       renderQuizStep();
     });
@@ -204,7 +221,22 @@ function renderQuizStep() {
       ${state.quizStep > 0 ? `<button class="btn-ghost" id="quiz-back">← Back</button>` : ""}
     </div>`;
 
+  // Seed from any previously-recorded answer for this step so tapping Back to an
+  // already-answered multi-select question shows prior selections instead of blank —
+  // otherwise users are forced to redo their picks blind every time they go back.
   const picked = new Set();
+  if (q.multi) {
+    const prevAnswer = state.quizAnswers[state.quizStep];
+    if (Array.isArray(prevAnswer)) {
+      q.options.forEach((o, i) => {
+        if (prevAnswer.includes(o.fx)) picked.add(i);
+      });
+    }
+  }
+  $$(".opt", wrap).forEach((btn, i) => {
+    if (picked.has(i)) btn.classList.add("sel");
+  });
+  if (q.multi) $("#quiz-next").disabled = picked.size === 0;
   $$(".opt", wrap).forEach((btn) => btn.addEventListener("click", () => {
     const i = Number(btn.dataset.i);
     if (q.multi) {
@@ -703,6 +735,13 @@ function msgEl(m) {
     el.appendChild(av);
   }
   el.appendChild(inner);
+  if (m.retry) {
+    // Timed-out replies get a real retry affordance instead of a dead-end error bubble —
+    // tapping it resends the exact request that failed (see retryVeraMessage).
+    el.classList.add("msg-retry");
+    inner.title = "Tap to retry";
+    inner.addEventListener("click", () => retryVeraMessage(m));
+  }
   if (m.cards && m.cards.length) {
     const cardWrap = document.createElement("div");
     cardWrap.className = "msg-cards";
@@ -721,13 +760,29 @@ function onChatSubmit(e) {
   sendToVera(text);
 }
 
+// Re-sends the exact request behind a failed (timed-out) reply — removes the dead error
+// bubble and re-runs the request with the same text/image, without duplicating the user's
+// original message bubble (it's already in state.chat from the first attempt).
+function retryVeraMessage(failedMsg) {
+  if (state.busy) return;
+  const idx = state.chat.indexOf(failedMsg);
+  if (idx !== -1) state.chat.splice(idx, 1);
+  renderChat();
+  requestVeraReply(failedMsg.retryText, failedMsg.retryImage);
+}
+
 async function sendToVera(text, image) {
   const userMsg = { role: "user", text, dataUrl: image ? image.dataUrl : null };
   state.chat.push(userMsg);
   SommDB.saveMessage("user", text, state.chatMode);
   renderChat();
   scrollChat();
+  await requestVeraReply(text, image);
+}
 
+// Does the actual AI call + typing indicator + error handling. Split out from sendToVera so
+// retryVeraMessage can re-run just this part without re-pushing the user's message.
+async function requestVeraReply(text, image) {
   const typing = document.createElement("div");
   typing.className = "msg assistant typing";
   typing.innerHTML = `<div class="vera-avatar sm">V</div><div class="bubble"><span class="tdot"></span><span class="tdot"></span><span class="tdot"></span></div>`;
@@ -785,7 +840,17 @@ async function sendToVera(text, image) {
     state.chat.push({ role: "assistant", text: prose, cards });
     SommDB.saveMessage("assistant", prose, state.chatMode, cards);
   } catch (err) {
-    state.chat.push({ role: "assistant", text: `⚠️ ${err.message}` });
+    // Timeouts are the one failure mode worth a real retry affordance — network errors and
+    // rate/budget limits need the user to actually do something different (check connection,
+    // wait), so only wire up "tap to retry" for the timeout case (see ai.js's AbortError copy).
+    const isTimeout = /tap to try again/i.test(err.message);
+    state.chat.push({
+      role: "assistant",
+      text: `⚠️ ${err.message}`,
+      retry: isTimeout ? true : null,
+      retryText: isTimeout ? text : null,
+      retryImage: isTimeout ? image : null,
+    });
   } finally {
     clearTimeout(thinkTimer);
     $("#chat-input").disabled = false;
@@ -911,6 +976,7 @@ function renderYou() {
       <button class="btn-ghost" id="p-redo">Redo onboarding</button>
       ${user ? `<button class="btn-ghost danger" id="p-delete-cloud">Delete my cloud data</button>` : ""}
       <button class="btn-ghost danger" id="p-reset">Reset everything</button>
+      <a class="btn-ghost" href="privacy.html" target="_blank" rel="noopener noreferrer" style="display:block">Privacy &amp; Terms</a>
     </section>`;
 
   $("#b-save").addEventListener("click", () => {

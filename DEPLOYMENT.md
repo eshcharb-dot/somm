@@ -36,12 +36,11 @@ One-time setup:
 
 **Alternative to steps 1-2**: Vercel's native GitHub integration (`vercel git connect` from
 `backend/`, or Project Settings → Git in the dashboard) deploys on push without any GitHub
-Actions secrets at all — Vercel's own systems watch the repo directly. If using this instead of
-`deploy-backend.yml`'s CLI-based deploy, confirm **Project Settings → General → Root Directory**
-is set to `backend` (this repo isn't a single-project repo — `src/` and `backend/` are siblings),
-otherwise Vercel will try to build from the repo root and fail. The two mechanisms are
-independent; deploy-backend.yml's pre-deploy test gate and post-deploy smoke test don't run for
-git-integration deploys, so prefer the Actions-secrets path if you want that safety net.
+Actions secrets at all — Vercel's own systems watch the repo directly. This is live as of
+2026-07-03: the project is Git-connected with Root Directory set to `backend`, confirmed working
+via a real push. The two mechanisms are independent; deploy-backend.yml's pre-deploy test gate
+and post-deploy smoke test don't run for git-integration deploys, so keep that workflow too if
+you want that safety net on top of the automatic deploy.
 
 After that, every push to `main` touching `backend/` redeploys automatically. You can also
 trigger it manually from the Actions tab (`workflow_dispatch`).

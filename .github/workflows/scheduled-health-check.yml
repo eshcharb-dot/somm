@@ -28,6 +28,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
       - name: Smoke test the live production backend
         run: node scripts/smoke-test.js "${{ secrets.SMOKE_TEST_URL || 'https://backend-nu-ashen-76.vercel.app' }}"

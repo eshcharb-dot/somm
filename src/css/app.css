@@ -241,6 +241,21 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .scan-tile:active { transform: scale(.97); }
 .scan-ico { font-size: 1.7rem; margin-bottom: 4px; }
 .scan-tile span:last-child { color: var(--muted); font-size: .84rem; }
+.scan-recent-head { font-size: .82rem; font-weight: 700; color: var(--ink-dim); text-transform: uppercase; letter-spacing: .02em; margin: 22px 0 8px; }
+.scan-recent-list { display: flex; flex-direction: column; gap: 8px; }
+.scan-recent-item {
+  font: inherit; color: var(--ink); cursor: pointer; text-align: left;
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 8px 12px; width: 100%;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none;
+}
+.scan-recent-item:hover { border-color: var(--wine); box-shadow: var(--shadow-sm); }
+.scan-recent-item img { width: 38px; height: 38px; object-fit: cover; border-radius: 8px; flex: 0 0 auto; }
+.scan-recent-ico { width: 38px; height: 38px; display: grid; place-items: center; font-size: 1.3rem; flex: 0 0 auto; background: var(--surface-2); border-radius: 8px; }
+.scan-recent-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.scan-recent-meta strong { font-size: .9rem; }
+.scan-recent-meta span:last-child { font-size: .78rem; color: var(--muted); }
 /* ---------- chat ---------- */
 #tab-vera { overflow: hidden; }
 #tab-vera[hidden] { display: none; }
@@ -367,6 +382,17 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .j-date { font-size: .78rem; color: var(--muted); }
 
 .field-label { display: block; font-size: .85rem; color: var(--ink-dim); margin: 12px 0 5px; }
+.field-hint { font-size: .78rem; color: var(--muted); margin: 5px 0 0; }
+
+/* Standard SR-only pattern — content readable by screen readers, invisible on screen.
+   Used by #chat-live (see index.html) so new replies are announced without re-reading
+   the whole rebuilt chat container. */
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  clip: rect(0 0 0 0); clip-path: inset(50%);
+  overflow: hidden; white-space: nowrap;
+}
 .danger-zone { display: flex; flex-wrap: wrap; gap: 4px 14px; }
 
 /* ---------- bottom nav ---------- */
@@ -452,6 +478,25 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 /* ---------- generic confirm/prompt dialog (replaces native confirm()/prompt()) ---------- */
 #dlg-modal { position: fixed; inset: 0; z-index: 110; display: flex; align-items: center; justify-content: center; }
 #dlg-modal[hidden] { display: none; }
+/* scan source chooser shares the dlg overlay/card look — one dialog language app-wide */
+#src-modal { position: fixed; inset: 0; z-index: 110; display: flex; align-items: center; justify-content: center; }
+#src-modal[hidden] { display: none; }
+#src-title { margin: 0 0 14px; font-size: .94rem; line-height: 1.45; }
+.src-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.src-option {
+  display: flex; align-items: center; gap: 12px; text-align: left;
+  font: inherit; color: var(--ink); cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: var(--shadow-sm); padding: 14px;
+  min-height: 60px;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.src-option:hover { border-color: var(--wine); box-shadow: var(--shadow-md); }
+.src-option:active { transform: scale(.98); }
+.src-ico { font-size: 1.6rem; flex: 0 0 auto; }
+.src-meta { display: flex; flex-direction: column; gap: 1px; }
+.src-meta span:last-child { color: var(--muted); font-size: .84rem; }
 .dlg-overlay {
   position: absolute; inset: 0;
   background: rgba(28, 20, 24, .4); backdrop-filter: blur(6px); cursor: pointer;

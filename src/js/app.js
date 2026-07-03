@@ -2,6 +2,8 @@
 "use strict";
 
 const CHAT_KEY = "somm.chat.v1";
+const LAST_SCANS_KEY = "somm.lastScans.v1";
+const LAST_SCANS_MAX = 5;
 
 const state = {
   profile: SommProfile.loadProfile(),
@@ -105,6 +107,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 function bindBackButton() {
   window.addEventListener("popstate", () => {
     const st = history.state;
+    if (!$("#src-modal").hidden && !(st && st.sommOverlay === "src")) {
+      hideScanSourceChooser();
+      return;
+    }
     if (!$("#dlg-modal").hidden && !(st && st.sommOverlay === "dlg")) {
       hideDlg();
       const resolve = dlgResolve;
@@ -174,6 +180,7 @@ function bindGlobal() {
   $$(".nav-btn").forEach((btn) => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
   $("#chat-form").addEventListener("submit", onChatSubmit);
   $("#scan-input").addEventListener("change", onScanFile);
+  $("#scan-input-camera").addEventListener("change", onScanFile);
   $("#tonight-form").addEventListener("submit", onTonightSubmit);
   $("#btn-surprise").addEventListener("click", () => runTonight("surprise me", true));
   $("#btn-store-picks").addEventListener("click", runStorePicks);
@@ -225,12 +232,16 @@ function renderQuizStep() {
           <div class="vera-avatar">V</div>
           <div class="vera-bubble">Hi, I'm <strong>Vera</strong> — your personal sommelier. A few quick questions and I'll start recommending wines that actually fit <em>your</em> taste — not just the crowd favourites. No wine knowledge needed.</div>
         </div>
-        <input id="onb-name" class="input" type="text" placeholder="What should I call you? (optional)" maxlength="24" autocomplete="given-name" />
+        <!-- Prefilled for "Redo onboarding" returners — the field is optional, so without the
+             prefill a returning user who skips it silently loses their name (and Vera stops
+             greeting them by it), despite the redo-confirm promising their data is kept. Same
+             logic pre-checks the age gate they already confirmed once. -->
+        <input id="onb-name" class="input" type="text" placeholder="What should I call you? (optional)" maxlength="24" autocomplete="given-name" value="${esc(state.profile.name || "")}" />
         <label class="onb-agegate">
-          <input type="checkbox" id="onb-agegate">
+          <input type="checkbox" id="onb-agegate" ${state.profile.ageConfirmed ? "checked" : ""}>
           <span>I confirm I'm of legal drinking age in my country</span>
         </label>
-        <button class="btn btn-primary btn-block" id="onb-start" disabled>Let's go</button>
+        <button class="btn btn-primary btn-block" id="onb-start" ${state.profile.ageConfirmed ? "" : "disabled"}>Let's go</button>
         <p class="onb-legal"><a href="privacy.html" target="_blank" rel="noopener noreferrer">Privacy &amp; Terms</a></p>
       </div>`;
     $("#onb-agegate").addEventListener("change", (e) => {
@@ -261,7 +272,7 @@ function renderQuizStep() {
       <h2 class="quiz-q">${esc(q.q)}</h2>
       <p class="quiz-sub">${esc(q.sub || "")}</p>
       <div class="quiz-opts">
-        ${q.options.map((o, i) => `<button class="opt" data-i="${i}">${esc(o.label)}</button>`).join("")}
+        ${q.options.map((o, i) => `<button class="opt" data-i="${i}" aria-pressed="false">${esc(o.label)}</button>`).join("")}
       </div>
       ${q.multi ? `<button class="btn btn-primary btn-block" id="quiz-next" disabled>Continue</button>` : ""}
       ${state.quizStep > 0 ? `<button class="btn-ghost" id="quiz-back">← Back</button>` : ""}
@@ -280,22 +291,28 @@ function renderQuizStep() {
     }
   }
   $$(".opt", wrap).forEach((btn, i) => {
-    if (picked.has(i)) btn.classList.add("sel");
+    if (picked.has(i)) { btn.classList.add("sel"); btn.setAttribute("aria-pressed", "true"); }
   });
   if (q.multi) $("#quiz-next").disabled = picked.size === 0;
   $$(".opt", wrap).forEach((btn) => btn.addEventListener("click", () => {
     const i = Number(btn.dataset.i);
     if (q.multi) {
       const isNone = !q.options[i].fx || !Object.keys(q.options[i].fx).length;
-      if (isNone) { picked.clear(); $$(".opt", wrap).forEach((b) => b.classList.remove("sel")); }
-      else {
+      if (isNone) {
+        picked.clear();
+        $$(".opt", wrap).forEach((b) => { b.classList.remove("sel"); b.setAttribute("aria-pressed", "false"); });
+      } else {
         // deselect the "none" option if it was picked
         q.options.forEach((o, j) => {
-          if (!o.fx || !Object.keys(o.fx).length) { picked.delete(j); $$(".opt", wrap)[j].classList.remove("sel"); }
+          if (!o.fx || !Object.keys(o.fx).length) {
+            picked.delete(j);
+            const b = $$(".opt", wrap)[j];
+            b.classList.remove("sel"); b.setAttribute("aria-pressed", "false");
+          }
         });
       }
-      if (picked.has(i)) { picked.delete(i); btn.classList.remove("sel"); }
-      else { picked.add(i); btn.classList.add("sel"); }
+      if (picked.has(i)) { picked.delete(i); btn.classList.remove("sel"); btn.setAttribute("aria-pressed", "false"); }
+      else { picked.add(i); btn.classList.add("sel"); btn.setAttribute("aria-pressed", "true"); }
       $("#quiz-next").disabled = picked.size === 0;
     } else {
       state.quizAnswers[state.quizStep] = q.options[i].fx;
@@ -372,6 +389,7 @@ function switchTab(tab, fromPopstate) {
   if (tab === "you") renderYou();
   if (tab === "vera") { renderChat(); $("#chat-scroll").scrollTop = $("#chat-scroll").scrollHeight; }
   if (tab === "tonight") renderTonightGreeting();
+  if (tab === "scan") renderScanRecent();
   if (changed && !fromPopstate) history.pushState({ sommTab: tab }, "");
 }
 
@@ -533,7 +551,43 @@ function runStorePicks() {
 // ============================== SCAN ==============================
 function scanWith(mode) {
   state.pendingScanMode = mode;
-  $("#scan-input").click();
+  openScanSourceChooser();
+}
+
+// ---- Scan source chooser (camera vs gallery) ----
+// capture="environment" jumps straight to the camera on phones but hides the gallery; omitting
+// it (the state since commit 381331a) does the reverse on many Android browsers — the picker
+// opens with no camera path at all, which killed the flagship in-aisle/at-table use case.
+// Only offering BOTH explicitly covers every browser: two hidden inputs (one per source, see
+// index.html) behind this lightweight on-brand chooser. Same overlay/card/history-stack
+// patterns as dlg-modal so the Android back gesture closes it instead of exiting the PWA.
+let srcPrevFocus = null;
+
+function openScanSourceChooser() {
+  const modal = $("#src-modal");
+  srcPrevFocus = document.activeElement;
+  modal.hidden = false;
+  history.pushState({ sommOverlay: "src" }, "");
+  $("#src-camera").focus();
+}
+
+// Raw hide — used by the popstate handler (browser already moved past our pushed entry) and by
+// closeScanSourceChooser(). Mirrors hideDlg()'s focus-restore behavior.
+function hideScanSourceChooser() {
+  const modal = $("#src-modal");
+  if (modal.hidden) return;
+  modal.hidden = true;
+  if (srcPrevFocus && typeof srcPrevFocus.focus === "function") srcPrevFocus.focus();
+  srcPrevFocus = null;
+}
+
+// UI-triggered close (Cancel, backdrop, Escape, or picking a source).
+function closeScanSourceChooser() {
+  if ($("#src-modal").hidden) return;
+  hideScanSourceChooser();
+  if (history.state && history.state.sommOverlay === "src") {
+    history.replaceState({ sommTab: state.tab }, "");
+  }
 }
 
 async function onScanFile(e) {
@@ -579,11 +633,15 @@ async function runScanAnalysis(img, mode) {
     const result = SommAI.parseScanResult(res.text);
     if (!result) throw new Error("Vera couldn't structure the analysis. Try a clearer photo or use chat.");
     if (myToken !== state.scanAbortToken) return; // user backed out — let it resolve quietly
+    saveLastScan(img, mode, result);
     showScanResultScreen(img, mode, result);
   } catch (err) {
     SommDB.logError("client", `scan:${mode}`, err);
     if (myToken !== state.scanAbortToken) return;
-    showScanResultScreen(img, mode, { error: err.message || "Analysis failed — try again." });
+    // ai.js's timeout copy says "tap to try again" — accurate in chat (the bubble is tappable),
+    // misleading here where the retry affordance is a real button on the error screen instead.
+    const msg = (err.message || "Analysis failed — try again.").replace(/\s*—\s*tap to try again\.?$/i, ".");
+    showScanResultScreen(img, mode, { error: msg });
   }
 }
 
@@ -638,6 +696,61 @@ const SCAN_LOADING_MSGS = {
     "Almost there — finalizing pairings…",
   ],
 };
+
+function loadLastScans() {
+  try { return JSON.parse(localStorage.getItem(LAST_SCANS_KEY)) || []; }
+  catch (e) { return []; }
+}
+
+// Persist completed (non-error) scan results so closing the scan-result screen or backgrounding
+// the PWA doesn't silently discard the picks and shelf-position wayfinding — exactly the moment
+// a user standing in a store aisle wants to recheck what Vera recommended, without re-shooting
+// the photo. Mirrors saveChat's slimming pattern: only the most recent couple of entries keep
+// their full image, the rest drop it, so this can't blow the localStorage quota.
+function saveLastScan(img, mode, result) {
+  const entry = { mode, result, dataUrl: img.dataUrl, ts: Date.now() };
+  const list = [entry, ...loadLastScans()].slice(0, LAST_SCANS_MAX);
+  const slim = list.map((s, i) => (i < 2 ? s : { ...s, dataUrl: null }));
+  try {
+    localStorage.setItem(LAST_SCANS_KEY, JSON.stringify(slim));
+  } catch (e) {
+    // QuotaExceededError — keep only the newest entry's image, then retry once. If it still
+    // fails, swallow silently so the scan UI still works, same fallback shape as saveChat.
+    try {
+      const stripped = slim.map((s, i) => (i === 0 ? s : { ...s, dataUrl: null }));
+      localStorage.setItem(LAST_SCANS_KEY, JSON.stringify(stripped));
+    } catch (_) { /* storage full — persistence skipped, UI still works */ }
+  }
+}
+
+const SCAN_MODE_ICON = { bottle: "🍾", shelf: "🛒", list: "📜", menu: "🍽️" };
+const SCAN_MODE_LABEL = { bottle: "Bottle", shelf: "Shelf Scan", list: "Wine List", menu: "Food Menu" };
+
+// "Return to your last scan" strip on the Scan tab's ready screen — lets a user re-open Vera's
+// picks (and shelf-position wayfinding) from a recent scan without re-shooting the photo, e.g.
+// after accidentally backing out or backgrounding the PWA mid-aisle.
+function renderScanRecent() {
+  const wrap = $("#scan-recent");
+  if (!wrap) return;
+  const scans = loadLastScans();
+  if (!scans.length) { wrap.innerHTML = ""; return; }
+  wrap.innerHTML = `
+    <p class="scan-recent-head">Recent scans</p>
+    <div class="scan-recent-list">
+      ${scans.map((s, i) => `
+        <button class="scan-recent-item" data-i="${i}">
+          ${s.dataUrl ? `<img src="${s.dataUrl}" alt="">` : `<span class="scan-recent-ico">${SCAN_MODE_ICON[s.mode] || "🍷"}</span>`}
+          <span class="scan-recent-meta">
+            <strong>${esc(SCAN_MODE_LABEL[s.mode] || "Scan")}</strong>
+            <span>${esc(new Date(s.ts).toLocaleDateString(undefined, { month: "short", day: "numeric" }))}</span>
+          </span>
+        </button>`).join("")}
+    </div>`;
+  $$(".scan-recent-item", wrap).forEach((btn) => btn.addEventListener("click", () => {
+    const s = scans[Number(btn.dataset.i)];
+    showScanResultScreen({ dataUrl: s.dataUrl || "" }, s.mode, s.result);
+  }));
+}
 
 function showScanResultScreen(img, mode, result) {
   const screen = $("#screen-scan-result");
@@ -713,6 +826,7 @@ function showScanResultScreen(img, mode, result) {
             <div>
               <p>${esc(result.error)}</p>
               ${showSignIn ? `<button class="btn btn-primary" style="margin-top:10px" id="sr-signin-fb">Sign in for your own budget →</button>` : ""}
+              ${img.b64 && !showSignIn ? `<button class="btn btn-primary" style="margin-top:10px" id="sr-retry">Try again</button>` : ""}
               <button class="btn btn-outline" style="margin-top:10px" id="sr-chat-fb">Try in chat instead →</button>
               <button class="btn btn-ghost" style="margin-top:10px" id="sr-feedback-fb">Something off? Tell Vera</button>
             </div>
@@ -720,6 +834,12 @@ function showScanResultScreen(img, mode, result) {
         </div>
       </div>`;
     $("#sr-back").addEventListener("click", closeScanResultScreen);
+    // Retry with the SAME photo — the whole point of scan mode is not re-shooting while standing
+    // in an aisle. Only offered when the full image is still in memory (img.b64; entries
+    // re-opened from "Recent scans" only keep a display dataUrl) and when the error isn't a
+    // budget/auth wall, where retrying without signing in would just hit the same wall.
+    const retryBtn = $("#sr-retry");
+    if (retryBtn) retryBtn.addEventListener("click", () => runScanAnalysis(img, mode));
     $("#sr-chat-fb").addEventListener("click", () => openScanInChat(img, mode));
     if (showSignIn) $("#sr-signin-fb").addEventListener("click", showAuthModal);
     $("#sr-feedback-fb").addEventListener("click", async () => {
@@ -741,7 +861,7 @@ function showScanResultScreen(img, mode, result) {
         <button class="sr-back" id="sr-back">← Back</button>
         <span class="sr-mode-tag">${esc(modeLabel)}</span>
       </div>
-      <img src="${img.dataUrl}" class="sr-photo" alt="Your scan">
+      ${img.dataUrl ? `<img src="${img.dataUrl}" class="sr-photo" alt="Your scan">` : ""}
       <div class="sr-body">
         <div class="sr-summary">
           <div class="vera-avatar sm">V</div>
@@ -889,9 +1009,33 @@ function renderChat() {
   state.chat.forEach((m) => wrap.appendChild(msgEl(m)));
   // mode chips
   $$(".mode-chip").forEach((c) => {
-    c.classList.toggle("active", c.dataset.mode === state.chatMode);
-    c.onclick = () => { state.chatMode = c.dataset.mode; renderChat(); };
+    const isActive = c.dataset.mode === state.chatMode;
+    c.classList.toggle("active", isActive);
+    c.setAttribute("aria-pressed", String(isActive));
+    c.onclick = () => {
+      if (state.chatMode === c.dataset.mode) return;
+      state.chatMode = c.dataset.mode;
+      // The chips silently changed Vera's framing with zero acknowledgment — first-time users
+      // couldn't tell anything happened and ignored one of the app's better features.
+      toast(MODE_CHANGE_NOTE[state.chatMode] || "Mode changed");
+      renderChat();
+    };
   });
+}
+
+const MODE_CHANGE_NOTE = {
+  tonight: "Home mode — pairing what's on tonight's table",
+  store: "Store mode — shelf picks in your budget",
+  restaurant: "Restaurant mode — list navigation & value calls",
+  chat: "Anything goes — ask away",
+};
+
+// Feeds the visually-hidden #chat-live region (see index.html) so screen readers hear ONLY the
+// newest reply — aria-live on #chat-scroll itself made every renderChat() rebuild re-announce
+// the entire conversation.
+function announceForScreenReader(text) {
+  const live = $("#chat-live");
+  if (live) live.textContent = String(text || "").slice(0, 400);
 }
 
 function msgEl(m) {
@@ -965,6 +1109,10 @@ async function sendToVera(text, image) {
 // Does the actual AI call + typing indicator + error handling. Split out from sendToVera so
 // retryVeraMessage can re-run just this part without re-pushing the user's message.
 async function requestVeraReply(text, image) {
+  // Capture BEFORE disabling the input below — refocusing unconditionally in `finally`
+  // re-opened the software keyboard over the reply the user is about to read, even when the
+  // message came from a starter chip or scan handoff where they never touched the keyboard.
+  const inputWasFocused = document.activeElement === $("#chat-input");
   const typing = document.createElement("div");
   typing.className = "msg assistant typing";
   typing.innerHTML = `<div class="vera-avatar sm">V</div><div class="bubble"><span class="tdot"></span><span class="tdot"></span><span class="tdot"></span></div>`;
@@ -1021,6 +1169,7 @@ async function requestVeraReply(text, image) {
     const { prose, cards } = SommAI.parseWineCards(res.text);
     state.chat.push({ role: "assistant", text: prose, cards });
     SommDB.saveMessage("assistant", prose, state.chatMode, cards);
+    announceForScreenReader(prose);
   } catch (err) {
     // Timeouts are the one failure mode worth a real retry affordance — network errors and
     // rate/budget limits need the user to actually do something different (check connection,
@@ -1034,11 +1183,12 @@ async function requestVeraReply(text, image) {
       retryText: isTimeout ? text : null,
       retryImage: isTimeout ? image : null,
     });
+    announceForScreenReader(err.message);
   } finally {
     clearTimeout(thinkTimer);
     $("#chat-input").disabled = false;
     $("#chat-form").querySelector("button[type=submit]").disabled = false;
-    $("#chat-input").focus();
+    if (inputWasFocused) $("#chat-input").focus();
     state.busy = false;
     saveChat();
     renderChat();
@@ -1147,11 +1297,13 @@ function renderYou() {
       <h3>Settings</h3>
       <label class="field-label">Currency</label>
       <select id="set-currency" class="input" aria-label="Currency">
-        ${["€", "$", "£", "₪"].map((c) => `<option ${state.settings.currency === c ? "selected" : ""}>${c}</option>`).join("")}
+        ${[["€", "Euro"], ["$", "US Dollar"], ["£", "British Pound"], ["₪", "Israeli Shekel"]]
+          .map(([c, name]) => `<option value="${c}" ${state.settings.currency === c ? "selected" : ""}>${c} ${name}</option>`).join("")}
       </select>
       <button class="btn btn-primary" id="set-save">Save settings</button>
       <p class="muted small" style="margin-top: 12px;">✓ Vera AI powered by Claude (via secure backend)</p>
       <p class="muted small">No API keys needed — just chat and scan. All requests are private.</p>
+      <p class="muted small">Free during beta — we'll tell you before anything changes.</p>
     </section>
 
     <section class="panel">
@@ -1173,8 +1325,15 @@ function renderYou() {
     </section>`;
 
   $("#b-save").addEventListener("click", () => {
-    p.budget.store = [Number($("#b-store-min").value) || 1, Number($("#b-store-max").value) || 25];
-    p.budget.restaurant = [Number($("#b-rest-min").value) || 1, Number($("#b-rest-max").value) || 65];
+    // Silently swap inverted ranges (min > max) rather than saving a band no wine can match.
+    const band = (lo, hi, dLo, dHi) => {
+      let a = Number(lo) || dLo, b = Number(hi) || dHi;
+      return a > b ? [b, a] : [a, b];
+    };
+    p.budget.store = band($("#b-store-min").value, $("#b-store-max").value, 1, 25);
+    p.budget.restaurant = band($("#b-rest-min").value, $("#b-rest-max").value, 1, 65);
+    $("#b-store-min").value = p.budget.store[0]; $("#b-store-max").value = p.budget.store[1];
+    $("#b-rest-min").value = p.budget.restaurant[0]; $("#b-rest-max").value = p.budget.restaurant[1];
     SommProfile.saveProfile(p);
     toast("Budget saved");
   });
@@ -1221,9 +1380,7 @@ function renderYou() {
   });
   $("#p-reset").addEventListener("click", async () => {
     if (await sommConfirm("Erase profile, journal, chat and settings on this device?", { confirmLabel: "Erase everything", danger: true })) {
-      localStorage.removeItem(PROFILE_KEY);
-      localStorage.removeItem(CHAT_KEY);
-      localStorage.removeItem(SETTINGS_KEY);
+      clearAllLocalData();
       location.reload();
     }
   });
@@ -1247,14 +1404,26 @@ function renderYou() {
         return;
       }
       await SommAuth.signOut();
-      localStorage.removeItem(PROFILE_KEY);
-      localStorage.removeItem(CHAT_KEY);
-      localStorage.removeItem(SETTINGS_KEY);
+      clearAllLocalData();
       location.reload();
     });
   } else {
     $("#you-signin").addEventListener("click", () => showAuthModal());
   }
+}
+
+// Both destructive flows above must clear EVERY somm.* key, not just profile/chat/settings —
+// LAST_SCANS_KEY holds actual photo dataUrls, and leaving those behind after "Erase everything"
+// contradicts both the reset promise and the Scan tab's "photos are not stored" copy.
+// Enumerating localStorage (rather than listing keys) means a future somm.* key can't be
+// forgotten here again.
+function clearAllLocalData() {
+  const doomed = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith("somm.")) doomed.push(k);
+  }
+  doomed.forEach((k) => localStorage.removeItem(k));
 }
 
 // ============================== GENERIC DIALOG ==============================
@@ -1326,6 +1495,24 @@ function sommPrompt(message, opts) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Scan source chooser — closing BEFORE .click() matters: some Android browsers suppress the
+  // file/camera picker if a modal grabs focus at the same moment it opens.
+  $("#src-camera").addEventListener("click", () => { closeScanSourceChooser(); $("#scan-input-camera").click(); });
+  $("#src-gallery").addEventListener("click", () => { closeScanSourceChooser(); $("#scan-input").click(); });
+  $("#src-cancel").addEventListener("click", () => closeScanSourceChooser());
+  $("#src-close").addEventListener("click", () => closeScanSourceChooser());
+  document.addEventListener("keydown", (e) => {
+    if ($("#src-modal").hidden) return;
+    if (e.key === "Escape") { closeScanSourceChooser(); return; }
+    if (e.key !== "Tab") return;
+    const focusable = focusableEls($("#src-modal .dlg-card"));
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+
   $("#dlg-cancel").addEventListener("click", () => closeDlg(false));
   $("#dlg-close").addEventListener("click", () => closeDlg(false));
   $("#dlg-confirm").addEventListener("click", () => {
@@ -1342,7 +1529,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if ($("#dlg-modal").hidden) return;
     if (e.key === "Escape") { closeDlg(false); return; }
     if (e.key !== "Tab") return;
-    const focusable = focusableEls($(".dlg-card"));
+    // Scoped under #dlg-modal — a bare $(".dlg-card") would grab #src-modal's card instead,
+    // since that modal shares the class and appears earlier in the DOM.
+    const focusable = focusableEls($("#dlg-modal .dlg-card"));
     if (!focusable.length) return;
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
@@ -1447,6 +1636,11 @@ function bindAuthModal() {
     $("#at-signup").classList.toggle("active", m === "signup");
     $("#auth-name-wrap").hidden = m === "signin";
     $("#auth-submit").textContent = m === "signin" ? "Sign in" : "Create account";
+    // new-password tells password managers to OFFER a generated password on signup instead of
+    // autofilling the existing one; the min-length hint shows Supabase's rule up front rather
+    // than as a rejection after submit.
+    $("#auth-password").setAttribute("autocomplete", m === "signin" ? "current-password" : "new-password");
+    $("#auth-pw-hint").hidden = m === "signin";
     const err = $("#auth-error");
     err.hidden = true;
     err.textContent = "";

@@ -8,6 +8,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Somm">
+<!-- Without this, iOS Safari's "Add to Home Screen" falls back to a page screenshot instead of
+     the wine-glass mark — bad first impression for a PWA whose install prompt is core to the
+     pitch. icon-192.png is already opaque (no alpha channel), which apple-touch-icon requires;
+     iOS scales it down from 192x192 to the 180x180 it wants. -->
+<link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#ffffff">
 <title>Somm — your pocket sommelier</title>
 <meta name="description" content="Somm — an AI sommelier that learns your palate. What to drink tonight, what to buy, what to order.">
@@ -66,10 +71,16 @@
             <span class="scan-ico">🍽️</span><strong>Food menu</strong><span>Pair my dinner</span>
           </button>
         </div>
+        <div id="scan-recent"></div>
         <p class="muted small center">Photos are sent to Claude for analysis and are not stored by Somm. Anthropic's privacy policy applies.</p>
       </div>
 
+      <!-- Two inputs because no single one covers both sources: capture="environment" jumps
+           straight to the camera on phones but hides the gallery, while omitting it (the state
+           since commit 381331a) leaves many Android pickers with no camera path at all — which
+           killed the flagship in-aisle/at-table use case. #src-modal chooses which gets clicked. -->
       <input type="file" id="scan-input" accept="image/*" hidden>
+      <input type="file" id="scan-input-camera" accept="image/*" capture="environment" hidden>
     </section>
 
     <!-- VERA -->
@@ -78,13 +89,18 @@
         <header class="tab-head chat-head">
           <h1 class="logo">Vera<span class="accent">.</span></h1>
           <div class="mode-chips">
-            <button class="mode-chip" data-mode="tonight">Home</button>
-            <button class="mode-chip" data-mode="store">Store</button>
-            <button class="mode-chip" data-mode="restaurant">Restaurant</button>
-            <button class="mode-chip" data-mode="chat">Anything</button>
+            <button class="mode-chip" data-mode="tonight" aria-pressed="false">Home</button>
+            <button class="mode-chip" data-mode="store" aria-pressed="false">Store</button>
+            <button class="mode-chip" data-mode="restaurant" aria-pressed="false">Restaurant</button>
+            <button class="mode-chip" data-mode="chat" aria-pressed="false">Anything</button>
           </div>
         </header>
-        <div id="chat-scroll" aria-live="polite"></div>
+        <!-- aria-live moved OFF #chat-scroll: renderChat() rebuilds the container's entire
+             innerHTML, so a live region there made screen readers re-announce the whole
+             conversation on every message/chip tap. #chat-live only ever receives the newest
+             assistant reply (see announceForScreenReader in app.js). -->
+        <div id="chat-scroll"></div>
+        <div id="chat-live" class="visually-hidden" aria-live="polite"></div>
         <form id="chat-form" class="chat-form">
           <input id="chat-input" class="input" type="text" placeholder="Ask Vera anything…" autocomplete="off" inputmode="text">
           <button class="btn btn-primary" type="submit" aria-label="Send">↑</button>
@@ -144,6 +160,7 @@
       <input class="input" id="auth-email" type="email" placeholder="you@example.com" autocomplete="email" required>
       <label class="field-label" style="margin-top:10px">Password</label>
       <input class="input" id="auth-password" type="password" placeholder="••••••••" autocomplete="current-password" required>
+      <p class="field-hint" id="auth-pw-hint" hidden>At least 6 characters</p>
       <p id="auth-error" class="auth-err" hidden></p>
       <button class="btn btn-primary btn-block" type="submit" id="auth-submit">Sign in</button>
     </form>
@@ -179,6 +196,27 @@
       </button>
       <button class="btn-ghost auth-skip" id="auth-skip" type="button">Continue without signing in</button>
       <p class="privacy-note">By signing in, your chat history, ratings and taste profile are stored in our cloud database (Supabase) indefinitely so they can sync across your devices. We don't share or sell your data, and you can delete it anytime from the You tab.</p>
+    </div>
+  </div>
+</div>
+
+<!-- SCAN SOURCE CHOOSER — camera vs gallery (see js/app.js#openScanSourceChooser) -->
+<div id="src-modal" hidden>
+  <div class="dlg-overlay" id="src-close"></div>
+  <div class="dlg-card" role="dialog" aria-modal="true" aria-label="Add a photo" tabindex="-1">
+    <p id="src-title">How do you want to add the photo?</p>
+    <div class="src-options">
+      <button class="src-option" id="src-camera" type="button">
+        <span class="src-ico">📷</span>
+        <span class="src-meta"><strong>Take a photo</strong><span>Point the camera at it now</span></span>
+      </button>
+      <button class="src-option" id="src-gallery" type="button">
+        <span class="src-ico">🖼️</span>
+        <span class="src-meta"><strong>From gallery</strong><span>Pick a photo you already took</span></span>
+      </button>
+    </div>
+    <div class="dlg-actions">
+      <button class="btn-ghost" id="src-cancel" type="button">Cancel</button>
     </div>
   </div>
 </div>

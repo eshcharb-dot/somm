@@ -142,12 +142,17 @@ async function callAI({ messages, system, provider, model, maxTokens, authToken 
     clearTimeout(timeout);
 
     if (!res.ok) {
-      const err = await res.json();
+      const err = await res.json().catch(() => ({}));
       // Prefer the backend's specific message (e.g. daily budget vs per-minute rate limit)
       // over a generic one — it tells the user what actually happened and what to do.
       if (res.status === 429) throw new Error(err.error || "Rate limited — wait a moment and try again.");
       if (res.status === 503) throw new Error(err.error || "AI service unavailable — try again later.");
-      throw new Error(err.error || `Backend error ${res.status}`);
+      // Raw upstream 5xx strings ("Backend error 500", provider JSON fragments) read as
+      // off-brand technical debris coming out of Vera's warm persona. The backend already
+      // logs the real error to error_reports (logBackendError), so nothing is lost by
+      // showing a human sentence here instead.
+      if (res.status >= 500) throw new Error("Something went sideways on Vera's end — give it another try in a minute.");
+      throw new Error(err.error || "Vera hit a snag with that request — try again.");
     }
 
     const data = await res.json();

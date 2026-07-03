@@ -243,6 +243,11 @@ app.post("/api/ai", async (req, res) => {
   const rate = await checkRateLimit(identity);
   if (!rate.ok) {
     if (rate.reason === "unavailable") {
+      // This is the exact failure mode that takes down 100% of the app's core feature for every
+      // user (Upstash outage/misconfig on a serverless deploy — see checkRateLimit's comment) —
+      // unlike every other failure path in this handler, it must not be invisible to
+      // error_reports. Fire-and-forget: never awaited, never throws, never delays the response.
+      logBackendError("api/ai:ratelimit-unavailable", new Error(`rate limit check unavailable for ${identity}`));
       return res.status(503).json({ error: "Rate limiting temporarily unavailable — try again shortly" });
     }
     return res.status(429).json({ error: "Rate limited (100 req/min per IP)" });
@@ -252,6 +257,8 @@ app.post("/api/ai", async (req, res) => {
   const budget = await checkDailyBudget(identity, maxTokens, budgetCap);
   if (!budget.ok) {
     if (budget.reason === "unavailable") {
+      // Same worst-case-outage visibility gap as the rate-limit branch above.
+      logBackendError("api/ai:budget-unavailable", new Error(`daily budget check unavailable for ${identity}`));
       return res.status(503).json({ error: "Usage budget check temporarily unavailable — try again shortly" });
     }
     return res.status(429).json({
@@ -336,6 +343,14 @@ async function callGroq(messages, system, model, maxTokens) {
 
 // Health check
 app.get("/health", (req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
+
+// Deployed commit SHA — lets live-vs-repo drift be checked at a glance (round-9 note: the
+// backend deploy pipeline has been broken before, so nothing in the repo alone can confirm what
+// the live backend is actually running). VERCEL_GIT_COMMIT_SHA is populated automatically by
+// Vercel at build time; GIT_COMMIT_SHA is a manual fallback for non-Vercel hosts. Both absent
+// (e.g. local dev without either set) reports "unknown" rather than failing.
+const DEPLOYED_SHA = process.env.VERCEL_GIT_COMMIT_SHA || process.env.GIT_COMMIT_SHA || "unknown";
+app.get("/version", (req, res) => res.json({ sha: DEPLOYED_SHA, timestamp: new Date().toISOString() }));
 
 // Start server — skipped when this file is `require()`d instead of run directly (e.g. by the
 // test suite in test/), so tests can exercise `app` and the cost-control functions below

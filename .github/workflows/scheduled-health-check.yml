@@ -1,0 +1,33 @@
+name: Scheduled Health Check
+
+# Proactive, timer-driven monitoring of the LIVE production backend — independent of pushes.
+# deploy-backend.yml only smoke-tests right after a deploy; between deploys, a mid-beta
+# credential lapse or Upstash pause (the "unavailable" reason on checkRateLimit/checkDailyBudget
+# in backend/server.js, which takes down 100% of the app's core AI feature for every user) would
+# otherwise go unnoticed until users complained. This reuses the same scripts/smoke-test.js
+# suite — which hits /health AND makes one real /api/ai call — against the live production URL
+# on an hourly timer, so an outage like that is caught within the hour instead of via bug
+# reports. Failures here surface as a red run in the Actions tab (and, if notifications are
+# enabled, an email/GitHub notification to the repo).
+#
+# Override the target URL with a repo secret (Settings → Secrets and variables → Actions →
+# SMOKE_TEST_URL) if the production backend ever moves; otherwise this defaults to the same
+# BACKEND_URL the frontend calls (see src/js/ai.js).
+on:
+  schedule:
+    - cron: "0 * * * *" # hourly
+  workflow_dispatch: {}
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Smoke test the live production backend
+        run: node scripts/smoke-test.js "${{ secrets.SMOKE_TEST_URL || 'https://backend-nu-ashen-76.vercel.app' }}"

@@ -86,6 +86,31 @@ test("GET /health responds ok without needing the shared token", async () => {
   }
 });
 
+test("GET /version reports the deployed commit SHA without needing the shared token", async () => {
+  const { app } = freshServer({ SOMM_TOKEN: "correct-token", VERCEL_GIT_COMMIT_SHA: "abc1234" });
+  const server = await listen(app);
+  try {
+    const res = await fetch(`${baseUrl(server)}/version`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.sha, "abc1234");
+  } finally {
+    await close(server);
+  }
+});
+
+test("GET /version falls back to 'unknown' when no commit SHA env var is set", async () => {
+  const { app } = freshServer({ SOMM_TOKEN: "correct-token", VERCEL_GIT_COMMIT_SHA: undefined, GIT_COMMIT_SHA: undefined });
+  const server = await listen(app);
+  try {
+    const res = await fetch(`${baseUrl(server)}/version`);
+    const body = await res.json();
+    assert.equal(body.sha, "unknown");
+  } finally {
+    await close(server);
+  }
+});
+
 // ---------- hasImageContent ----------
 
 test("hasImageContent: true when any message carries an image content block", () => {

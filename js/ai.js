@@ -39,7 +39,9 @@ async function initFxRates() {
 // Build a currency block for system prompts — live rates + conversion instructions.
 function buildFxBlock(userCurrency) {
   const sym2code = { "€": "EUR", "$": "USD", "£": "GBP", "₪": "ILS" };
-  const userCode = sym2code[userCurrency] || "ILS";
+  // Fallback must be EUR (the app's reference currency), not any specific display currency —
+  // an unknown symbol here would otherwise make Vera convert every price into the wrong one.
+  const userCode = sym2code[userCurrency] || "EUR";
   const rates = _fxCache.rates;
   const userRate = rates ? (rates[userCode] || null) : null;
 
@@ -370,6 +372,18 @@ function convertFromEUR(amountEUR, currency) {
   return Math.round(amountEUR * rates[code]);
 }
 
+// Inverse of convertFromEUR — used when the user EDITS a money amount in their display
+// currency (You-tab budget inputs) and it must round-trip back into the EUR reference values
+// the recommendation engine and quiz bands are stored in. Same 1:1 fallback when rates
+// haven't loaded, so a fallback-converted value never gets double-converted later.
+function convertToEUR(amount, currency) {
+  const sym2code = { "€": "EUR", "$": "USD", "£": "GBP", "₪": "ILS" };
+  const code = sym2code[currency] || "EUR";
+  const rates = _fxCache.rates;
+  if (!rates || !rates[code]) return Math.round(amount);
+  return Math.round(amount / rates[code]);
+}
+
 function getFxRates() { return _fxCache.rates; }
 
-const SommAI = { initFxRates, buildSystemPrompt, buildScanSystemPrompt, parseScanResult, callAI, parseWineCards, prepareImage, convertFromEUR, getFxRates };
+const SommAI = { initFxRates, buildSystemPrompt, buildScanSystemPrompt, parseScanResult, callAI, parseWineCards, prepareImage, convertFromEUR, convertToEUR, getFxRates };

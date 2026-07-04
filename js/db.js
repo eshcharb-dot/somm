@@ -44,6 +44,11 @@ async function saveProfile(profile, settings) {
       confidence: SommProfile.confidencePct(profile) / 100,
       adventurousness: profile.adventure || 0.5,
       ratings_count: profile.ratingCount || 0,
+      // The complete profile object — the columns above are a lossy display snapshot, and
+      // restoring from them alone left second-device sign-ins with an empty journal and lost
+      // nos/types/grapes/regions (the exact data the sign-in copy promises travels with you).
+      // History is already capped at 200 entries by learnFromRating, so size stays bounded.
+      full_profile: profile,
     });
   } catch (e) { console.warn("db.saveProfile:", e.message); }
 }

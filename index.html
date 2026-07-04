@@ -72,7 +72,9 @@
           </button>
         </div>
         <div id="scan-recent"></div>
-        <p class="muted small center">Photos are sent to Claude for analysis and are not stored by Somm. Anthropic's privacy policy applies.</p>
+        <!-- "not stored by Somm" alone became misleading once Recent scans started keeping
+             photos in this device's localStorage — servers vs device is the honest split. -->
+        <p class="muted small center">Photos are analyzed by Claude and never stored on our servers — recent scans stay on this device only. Anthropic's privacy policy applies.</p>
       </div>
 
       <!-- Two inputs because no single one covers both sources: capture="environment" jumps
@@ -195,7 +197,10 @@
         Continue with Google
       </button>
       <button class="btn-ghost auth-skip" id="auth-skip" type="button">Continue without signing in</button>
-      <p class="privacy-note">By signing in, your chat history, ratings and taste profile are stored in our cloud database (Supabase) indefinitely so they can sync across your devices. We don't share or sell your data, and you can delete it anytime from the You tab.</p>
+      <!-- Precise about what actually syncs DOWN on a new device (profile/ratings/journal via
+           full_profile) vs what's only backed up (chat messages upload but don't restore) —
+           the old copy promised chat history "syncs across your devices", which it doesn't. -->
+      <p class="privacy-note">By signing in, your taste profile, ratings and journal sync across your devices, and your chat messages are backed up — all stored in our cloud database (Supabase) indefinitely. We don't share or sell your data, and you can delete it anytime from the You tab.</p>
     </div>
   </div>
 </div>

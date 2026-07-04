@@ -159,10 +159,22 @@ async function syncProfileOnSignIn() {
   try { cloud = await SommDB.getProfile(); } catch (e) { console.warn("cloud profile fetch failed", e); }
 
   if (cloud && (cloud.ratings_count || 0) > (state.profile.ratingCount || 0)) {
-    state.profile.name = cloud.display_name || state.profile.name;
-    state.profile.dims = { ...state.profile.dims, ...(cloud.palate || {}) };
-    if (typeof cloud.adventurousness === "number") state.profile.adventure = cloud.adventurousness;
-    state.profile.ratingCount = cloud.ratings_count;
+    if (cloud.full_profile && typeof cloud.full_profile === "object") {
+      // Lossless restore: full_profile carries the entire client profile (journal/history,
+      // nos, type affinities, grape+region learnings, budget) — the palate-snapshot columns
+      // below only cover dims, which left second-device sign-ins with an empty journal
+      // despite the sign-in copy's promise. Keep the stricter of the two age confirmations.
+      const ageOk = state.profile.ageConfirmed || !!cloud.full_profile.ageConfirmed;
+      state.profile = Object.assign(SommProfile.defaultProfile(), cloud.full_profile);
+      state.profile.ageConfirmed = ageOk;
+    } else {
+      // Older cloud rows predate the full_profile column — partial restore is still better
+      // than clobbering the richer cloud data with a blank local profile.
+      state.profile.name = cloud.display_name || state.profile.name;
+      state.profile.dims = { ...state.profile.dims, ...(cloud.palate || {}) };
+      if (typeof cloud.adventurousness === "number") state.profile.adventure = cloud.adventurousness;
+      state.profile.ratingCount = cloud.ratings_count;
+    }
     state.profile.onboarded = true;
     SommProfile.saveProfile(state.profile);
     if (cloud.currency) {
@@ -439,21 +451,45 @@ function wineCardEl(card, context) {
       <button class="rate" data-r="ok">Fine</button>
       <button class="rate" data-r="no">Not for me</button>
     </div>`;
+  bindRateButtons(el, {
+    name: card.name, region: card.region, grape: card.grape, type: card.type,
+    attrs: card.attrs, price: card.price,
+  }, context);
+  return el;
+}
+
+const RATE_BUTTONS_HTML = `
+      <button class="rate" data-r="love">♥ Loved it</button>
+      <button class="rate" data-r="ok">Fine</button>
+      <button class="rate" data-r="no">Not for me</button>`;
+
+// Shared by wineCardEl and srPickCard. Rating trains the profile IMMEDIATELY
+// (learnFromRating), so a mis-tap — or rating a wine the vision scan misidentified — would
+// otherwise permanently teach Vera the wrong palate. Undo restores a pre-rating snapshot and
+// re-arms the buttons. Cloud-side: the wine_ratings row isn't deleted on undo (saveRating
+// returns no row id), but the snapshot push that follows overwrites the cloud palate, which
+// is what recommendation quality actually depends on.
+function bindRateButtons(el, wine, context) {
   $$(".rate", el).forEach((btn) => btn.addEventListener("click", () => {
     const rating = btn.dataset.r;
-    const wine = {
-      name: card.name, region: card.region, grape: card.grape, type: card.type,
-      attrs: card.attrs, price: card.price,
-    };
+    const snapshot = JSON.stringify(state.profile);
     SommProfile.learnFromRating(state.profile, wine, rating, context);
     const dbRating = rating === "love" ? "loved" : rating === "ok" ? "fine" : "skip";
     SommDB.saveRating(wine, dbRating, context);
     SommDB.saveProfile(state.profile, state.settings);
-    $(".wc-actions", el).innerHTML = `<span class="rated">${
+    const actions = $(".wc-actions", el);
+    actions.innerHTML = `<span class="rated">${
       rating === "love" ? "Noted — more like this ♥" : rating === "ok" ? "Noted." : "Got it — steering away."
-    } <em>(profile ${SommProfile.confidencePct(state.profile)}%)</em></span>`;
+    } <em>(profile ${SommProfile.confidencePct(state.profile)}%)</em></span><button class="btn-ghost rated-undo">Undo</button>`;
+    $(".rated-undo", el).addEventListener("click", () => {
+      state.profile = Object.assign(SommProfile.defaultProfile(), JSON.parse(snapshot));
+      SommProfile.saveProfile(state.profile);
+      SommDB.saveProfile(state.profile, state.settings);
+      actions.innerHTML = RATE_BUTTONS_HTML;
+      bindRateButtons(el, wine, context);
+      toast("Rating undone");
+    });
   }));
-  return el;
 }
 
 // ============================== TONIGHT ==============================
@@ -531,9 +567,14 @@ function runStorePicks() {
     n: 3, budget: state.profile.budget.store,
     fxRates: SommAI.getFxRates(), currency: state.settings.currency,
   });
+  // budget.store holds EUR reference values — convert before pairing with the user's currency
+  // symbol. Raw numbers next to "₪" showed an Israeli user "₪12–25" for a €12–25 band (~4x off).
+  const cur = state.settings.currency;
+  const bLo = SommAI.convertFromEUR(state.profile.budget.store[0], cur);
+  const bHi = SommAI.convertFromEUR(state.profile.budget.store[1], cur);
   const intro = document.createElement("div");
   intro.className = "vera-line";
-  intro.innerHTML = `<div class="vera-avatar sm">V</div><div class="vera-bubble">Your shopping shortlist — styles to grab in your budget (${state.settings.currency}${state.profile.budget.store[0]}–${state.profile.budget.store[1]}):</div>`;
+  intro.innerHTML = `<div class="vera-avatar sm">V</div><div class="vera-bubble">Your shopping shortlist — styles to grab in your budget (${cur}${bLo}–${bHi}):</div>`;
   wrap.appendChild(intro);
   recs.forEach(({ wine, score }) => wrap.appendChild(wineCardEl(localCard(wine, score), "store list")));
 
@@ -543,7 +584,7 @@ function runStorePicks() {
   ask.addEventListener("click", () => {
     state.chatMode = "store";
     switchTab("vera");
-    sendToVera(`Shopping list — my budget is ${state.settings.currency}${state.profile.budget.store[0]}–${state.profile.budget.store[1]}. Which of these styles should I prioritise and why?`);
+    sendToVera(`Shopping list — my budget is ${cur}${bLo}–${bHi}. Which of these styles should I prioritise and why?`);
   });
   wrap.appendChild(ask);
 }
@@ -627,11 +668,21 @@ async function runScanAnalysis(img, mode) {
       ],
     }];
     const res = await SommAI.callAI({
-      messages, system, provider: "claude", model: "claude-opus-4-8", maxTokens: 2000,
+      // 3500, not 2000: a 5-pick shelf scan with all the verbose per-pick fields can exceed
+      // 2000 output tokens, truncating the JSON mid-stream — the closing tag never arrived,
+      // parse failed, and the user got an error blaming their photo after a 20s wait.
+      // Backend hard-caps at 4096 regardless.
+      messages, system, provider: "claude", model: "claude-opus-4-8", maxTokens: 3500,
       authToken: SommAuth.getUser() ? await SommAuth.getAccessToken() : null,
     });
     const result = SommAI.parseScanResult(res.text);
-    if (!result) throw new Error("Vera couldn't structure the analysis. Try a clearer photo or use chat.");
+    if (!result) {
+      // Distinguish "response was cut off" (our budget, not their photo) from a genuine
+      // can't-structure failure — blaming the user's photo for a truncation is a trust hit.
+      throw new Error(res.stopReason === "max_tokens"
+        ? "That photo had a lot going on and Vera ran out of room. Try a tighter shot with fewer bottles in frame."
+        : "Vera couldn't structure the analysis. Try a clearer photo or use chat.");
+    }
     if (myToken !== state.scanAbortToken) return; // user backed out — let it resolve quietly
     saveLastScan(img, mode, result);
     showScanResultScreen(img, mode, result);
@@ -811,7 +862,7 @@ function showScanResultScreen(img, mode, result) {
     // budget) rather than leaving people to assume the app itself is broken. Same nudge for the
     // backend's REQUIRE_AUTH_FOR_VISION 401 ("sign in to analyze photos" — see backend/server.js),
     // if that's ever turned on.
-    const isAuthPromptErr = /budget|sign in/i.test(result.error);
+    const isAuthPromptErr = /budget|limit|allowance|sign in/i.test(result.error);
     const showSignIn = isAuthPromptErr && !SommAuth.getUser();
     screen.innerHTML = `
       <div class="sr-wrap">
@@ -871,7 +922,7 @@ function showScanResultScreen(img, mode, result) {
         <div id="sr-picks-list"></div>
         <button class="btn btn-outline btn-block" id="sr-chat-cta">Ask Vera for more →</button>
         ${showSignInNudge ? `<div class="signin-nudge" style="margin-top:14px">
-          <p>Liking Vera so far? Sign in to keep your taste profile and ratings across devices — and get your own daily usage budget instead of sharing one with everyone on this wifi.</p>
+          <p>Liking Vera so far? Sign in to keep your taste profile and ratings across devices — and get your own daily usage allowance instead of sharing one with everyone on this wifi.</p>
           <button class="btn btn-primary" id="sr-signin-nudge">Sign in / Create account</button>
         </div>` : ""}
       </div>
@@ -913,17 +964,7 @@ function srPickCard(pick, context) {
       <button class="rate" data-r="no">Not for me</button>
     </div>`;
 
-  $$(".rate", el).forEach((btn) => btn.addEventListener("click", () => {
-    const rating = btn.dataset.r;
-    const wine = { name: pick.name, region: pick.region, grape: pick.grape, type: pick.type, attrs: pick.attrs, price: pick.label_price };
-    SommProfile.learnFromRating(state.profile, wine, rating, context);
-    const dbRating = rating === "love" ? "loved" : rating === "ok" ? "fine" : "skip";
-    SommDB.saveRating(wine, dbRating, context);
-    SommDB.saveProfile(state.profile, state.settings);
-    $(".wc-actions", el).innerHTML = `<span class="rated">${
-      rating === "love" ? "Noted — more like this ♥" : rating === "ok" ? "Noted." : "Got it — steering away."
-    } <em>(profile ${SommProfile.confidencePct(state.profile)}%)</em></span>`;
-  }));
+  bindRateButtons(el, { name: pick.name, region: pick.region, grape: pick.grape, type: pick.type, attrs: pick.attrs, price: pick.label_price }, context);
   return el;
 }
 
@@ -1276,14 +1317,14 @@ function renderYou() {
     </section>
 
     <section class="panel">
-      <h3>Budget <span class="muted">(per bottle)</span></h3>
+      <h3>Budget <span class="muted">(per bottle, in ${esc(state.settings.currency)})</span></h3>
       <div class="budget-row"><label id="b-store-label">Store</label>
-        <input type="number" id="b-store-min" value="${p.budget.store[0]}" min="1" aria-label="Store budget minimum" aria-describedby="b-store-label"> –
-        <input type="number" id="b-store-max" value="${p.budget.store[1]}" min="1" aria-label="Store budget maximum" aria-describedby="b-store-label">
+        <input type="number" id="b-store-min" value="${SommAI.convertFromEUR(p.budget.store[0], state.settings.currency)}" min="1" aria-label="Store budget minimum" aria-describedby="b-store-label"> –
+        <input type="number" id="b-store-max" value="${SommAI.convertFromEUR(p.budget.store[1], state.settings.currency)}" min="1" aria-label="Store budget maximum" aria-describedby="b-store-label">
       </div>
       <div class="budget-row"><label id="b-rest-label">Restaurant</label>
-        <input type="number" id="b-rest-min" value="${p.budget.restaurant[0]}" min="1" aria-label="Restaurant budget minimum" aria-describedby="b-rest-label"> –
-        <input type="number" id="b-rest-max" value="${p.budget.restaurant[1]}" min="1" aria-label="Restaurant budget maximum" aria-describedby="b-rest-label">
+        <input type="number" id="b-rest-min" value="${SommAI.convertFromEUR(p.budget.restaurant[0], state.settings.currency)}" min="1" aria-label="Restaurant budget minimum" aria-describedby="b-rest-label"> –
+        <input type="number" id="b-rest-max" value="${SommAI.convertFromEUR(p.budget.restaurant[1], state.settings.currency)}" min="1" aria-label="Restaurant budget maximum" aria-describedby="b-rest-label">
       </div>
       <button class="btn btn-outline" id="b-save">Save budget</button>
     </section>
@@ -1325,15 +1366,18 @@ function renderYou() {
     </section>`;
 
   $("#b-save").addEventListener("click", () => {
-    // Silently swap inverted ranges (min > max) rather than saving a band no wine can match.
+    // Inputs are edited in the user's display currency (labeled above); the engine and quiz
+    // bands are EUR reference values, so convert back on save. Also silently swap inverted
+    // ranges (min > max) rather than saving a band no wine can match.
+    const cur = state.settings.currency;
     const band = (lo, hi, dLo, dHi) => {
-      let a = Number(lo) || dLo, b = Number(hi) || dHi;
+      let a = SommAI.convertToEUR(Number(lo), cur) || dLo, b = SommAI.convertToEUR(Number(hi), cur) || dHi;
       return a > b ? [b, a] : [a, b];
     };
     p.budget.store = band($("#b-store-min").value, $("#b-store-max").value, 1, 25);
     p.budget.restaurant = band($("#b-rest-min").value, $("#b-rest-max").value, 1, 65);
-    $("#b-store-min").value = p.budget.store[0]; $("#b-store-max").value = p.budget.store[1];
-    $("#b-rest-min").value = p.budget.restaurant[0]; $("#b-rest-max").value = p.budget.restaurant[1];
+    $("#b-store-min").value = SommAI.convertFromEUR(p.budget.store[0], cur); $("#b-store-max").value = SommAI.convertFromEUR(p.budget.store[1], cur);
+    $("#b-rest-min").value = SommAI.convertFromEUR(p.budget.restaurant[0], cur); $("#b-rest-max").value = SommAI.convertFromEUR(p.budget.restaurant[1], cur);
     SommProfile.saveProfile(p);
     toast("Budget saved");
   });

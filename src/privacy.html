@@ -43,8 +43,10 @@
       also stored in our cloud database (Supabase), tied to your account, so it can sync across
       devices. Access is restricted to your account via row-level security.</li>
     <li><strong>Photos:</strong> when you scan a bottle, shelf, wine list or menu, the photo is
-      sent to our backend and forwarded to Anthropic's Claude API for analysis. Photos are not
-      stored by Somm. Anthropic's own privacy policy applies to that processing.</li>
+      sent to our backend and forwarded to Anthropic's Claude API for analysis. Photos are never
+      stored on our servers; your recent scans (including the photo) are kept on your device
+      only, and are removed by "Reset everything". Anthropic's own privacy policy applies to
+      that processing.</li>
     <li><strong>Chat messages:</strong> sent to our backend, which proxies them to Claude (or
       Groq) to generate Vera's replies. Backend request logs may briefly contain message text
       for debugging/abuse-prevention purposes.</li>

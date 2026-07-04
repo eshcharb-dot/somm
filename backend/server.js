@@ -259,12 +259,15 @@ app.post("/api/ai", async (req, res) => {
     if (budget.reason === "unavailable") {
       // Same worst-case-outage visibility gap as the rate-limit branch above.
       logBackendError("api/ai:budget-unavailable", new Error(`daily budget check unavailable for ${identity}`));
-      return res.status(503).json({ error: "Usage budget check temporarily unavailable — try again shortly" });
+      return res.status(503).json({ error: "Usage check temporarily unavailable — try again shortly" });
     }
+    // "limit", never "budget", in user-facing copy — "budget" already means the user's wine
+    // budget everywhere in this app, and reusing it here read as "you've spent your wine
+    // budget" to a beta tester (round-12 finding).
     return res.status(429).json({
       error: userId
-        ? "Daily usage budget reached for your account — resets at midnight UTC."
-        : "This network has hit today's shared usage budget (this limit is per wifi/IP, not personal) — sign in for your own budget, or try again tomorrow.",
+        ? "Daily usage limit reached for your account — resets at midnight UTC."
+        : "This network has hit today's shared daily limit (it's per wifi/IP, not personal) — sign in for your own allowance, or try again tomorrow.",
     });
   }
 

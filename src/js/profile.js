@@ -258,7 +258,11 @@ function profileForPrompt(p) {
     `Palate: ${DIM_KEYS.map(dimDesc).join(", ")}.`,
     `Type affinity: ${typePrefs}.`,
     `Adventurousness: ${p.adventure < 0.33 ? "low — prefers familiar wines" : p.adventure < 0.6 ? "moderate" : "high — loves discovering new things"}.`,
-    `Budget: store ${p.budget.store[0]}–${p.budget.store[1]}, restaurant ${p.budget.restaurant[0]}–${p.budget.restaurant[1]} (per bottle).`,
+    // Explicitly EUR — these are the app's stored reference values. Unlabeled numbers here
+    // made Vera read them in the user's display currency (a ₪ user's €12–25 became "₪12–25",
+    // i.e. wines ~4x too cheap). The CURRENCY block in the system prompt gives Vera live FX
+    // rates to convert with when speaking to the user.
+    `Budget (EUR reference values — convert per the CURRENCY block when talking to the user): store €${p.budget.store[0]}–€${p.budget.store[1]}, restaurant €${p.budget.restaurant[0]}–€${p.budget.restaurant[1]} (per bottle).`,
     p.nos.length ? `HARD NOS (never recommend): ${p.nos.join(", ")}.` : "No hard restrictions.",
     fav(p.grapes).length ? `Loved grapes: ${fav(p.grapes).join(", ")}.` : "",
     avoid(p.grapes).length ? `Disliked grapes: ${avoid(p.grapes).join(", ")}.` : "",

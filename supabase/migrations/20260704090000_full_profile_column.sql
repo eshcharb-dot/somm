@@ -1,0 +1,12 @@
+-- The profiles row previously stored only a lossy palate snapshot (dims/adventurousness/
+-- ratings_count), so signing in on a second device restored a hollow profile: empty journal,
+-- lost hard-nos/type affinities/grape+region learnings — contradicting the sign-in promise
+-- "your ratings and preferences travel with you" (round-12 review, confirmed against
+-- src/js/db.js#saveProfile and src/js/app.js#syncProfileOnSignIn). full_profile carries the
+-- complete client profile object (types, nos, budget, grapes, regions, history) so restore
+-- is lossless. Existing RLS policies on profiles cover the new column automatically
+-- (policies are row-scoped, not column-scoped).
+--
+-- Applied to the live project on 2026-07-04 via apply_migration at the same time this file
+-- was committed.
+alter table public.profiles add column if not exists full_profile jsonb;

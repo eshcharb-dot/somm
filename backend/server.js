@@ -2,7 +2,12 @@
 // Receives AI requests from frontend, calls Claude/Groq, returns responses
 // Keeps API keys secure (never exposed to client)
 
-require("dotenv").config();
+// quiet: true is load-bearing, not cosmetic — dotenv v17 prints an "injected env" banner to
+// STDOUT on every config() call. The test suite re-requires this module per scenario
+// (test/helpers.js#freshServer), and those mid-test stdout writes intermittently corrupted
+// node --test's child-process message stream on Linux CI ("Unable to deserialize cloned
+// data") — the flaky failure previously misattributed to the Node version.
+require("dotenv").config({ quiet: true });
 const express = require("express");
 const cors = require("cors");
 const fetch = require("node-fetch");

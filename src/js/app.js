@@ -533,8 +533,12 @@ function renderTonightGreeting() {
   const p = state.profile;
   const h = new Date().getHours();
   const part = h < 12 ? "morning" : h < 18 ? "afternoon" : "evening";
+  // The question matches the time of day — "what's on the table tonight?" read oddly at
+  // 9 AM next to "Good morning" (the meal being planned is dinner, but the phrasing
+  // shouldn't fight the greeting).
+  const q = h < 12 ? "What's cooking later?" : h < 18 ? "What's for dinner tonight?" : "What's on the table tonight?";
   $("#tonight-greet").textContent =
-    `Good ${part}${p.name ? ", " + p.name : ""}. What's on the table tonight?`;
+    `Good ${part}${p.name ? ", " + p.name : ""}. ${q}`;
 
   // Daily pour: keep the screen alive before the first search.
   const wrap = $("#tonight-results");

@@ -431,25 +431,61 @@ function matchBadgeText(pct) {
   return conf < 40 ? `${p}% estimated match` : `~${p}% match`;
 }
 
+// Short mono tag for the card head's right slot — where this recommendation came from.
+const CONTEXT_TAGS = { "tonight": "Tonight", "store list": "Store", "onboarding": "First pour" };
+function contextTag(context) {
+  if (!context) return "";
+  if (CONTEXT_TAGS[context]) return CONTEXT_TAGS[context];
+  if (String(context).startsWith("vera")) return "Vera";
+  return String(context);
+}
+
+// Measurement-rail attribute scales (Body/Tannin/Fruit/Acidity) — the Atelier card's
+// "spec sheet" element. Rendered only when the card carries a full attrs vector (local
+// catalog cards always do; Vera's chat cards and scan picks usually do per the wine-card
+// protocol, and gracefully omit otherwise).
+function scalesHtml(attrs) {
+  if (!attrs) return "";
+  const rows = [["body", "Body"], ["tannin", "Tannin"], ["fruit", "Fruit"], ["acid", "Acidity"]]
+    .filter(([k]) => typeof attrs[k] === "number");
+  if (rows.length < 4) return "";
+  return `<div class="scales">${rows.map(([k, label]) => {
+    const v = Math.max(.05, Math.min(.95, attrs[k]));
+    const word = attrs[k] >= .66 ? "High" : attrs[k] >= .33 ? "Med" : "Low";
+    return `<div class="scale"><div class="scale-lab"><span>${label}</span><b>${word}</b></div>
+      <div class="rail"><i></i><i></i><i></i><b style="left:${(v * 100).toFixed(0)}%"></b></div></div>`;
+  }).join("")}</div>`;
+}
+
 function wineCardEl(card, context) {
   const el = document.createElement("div");
   el.className = "wine-card";
-  const typeClass = { red: "t-red", white: "t-white", rose: "t-rose", sparkling: "t-spark", orange: "t-orange", dessert: "t-dessert" }[card.type] || "t-red";
+  const conf = SommProfile.confidencePct(state.profile);
+  // Same honesty split as the old badge: while the profile has little rating history,
+  // say so at the number itself instead of implying precision.
+  const cap = conf < 40 ? "Estimated match — profile warming up" : "Estimated match — your palate";
+  const headLeft = [SommProfile.TYPE_LABELS[card.type] || card.type || "Wine", card.region].filter(Boolean).join(" — ");
+  const sub = [card.grape, card.price ? `${card.price} · est.` : null].filter(Boolean).join(" · ");
   el.innerHTML = `
-    <div class="wc-head">
-      <span class="wc-type ${typeClass}">${esc((SommProfile.TYPE_LABELS[card.type] || card.type || "wine").toUpperCase())}</span>
-      <span class="wc-match" title="Estimated fit vs your taste profile — not a guarantee">${matchBadgeText(card.match)}</span>
-    </div>
-    <div class="wc-name">${esc(card.name)}</div>
-    <div class="wc-meta">${esc([card.grape, card.region].filter(Boolean).join(" · "))}${card.price ? ` · <strong title="Estimate — not a live price lookup">${esc(card.price)}</strong>` : ""}</div>
-    ${card.price ? `<div class="wc-price-caveat">est., not a live price check</div>` : ""}
-    <a class="wc-buy" href="https://www.wine-searcher.com/find/${encodeURIComponent(card.name)}" target="_blank" rel="noopener noreferrer">Find online →</a>
-    ${card.why ? `<div class="wc-why">${esc(card.why)}</div>` : ""}
-    ${card.pairing ? `<div class="wc-pair">🍽 ${esc(card.pairing)}</div>` : ""}
-    <div class="wc-actions">
-      <button class="rate" data-r="love">♥ Loved it</button>
-      <button class="rate" data-r="ok">Fine</button>
-      <button class="rate" data-r="no">Not for me</button>
+    <span class="wc-cm"></span>
+    <div class="wc-inner">
+      <div class="wc-head">
+        <span class="microlabel">${esc(headLeft)}</span>
+        <span class="microlabel ctx">${esc(contextTag(context))}</span>
+      </div>
+      <div class="wc-center">
+        <div class="wc-name">${esc(card.name)}</div>
+        ${sub ? `<div class="wc-sub num">${esc(sub)}</div>` : ""}
+        ${card.match != null ? `
+        <div class="rule-orn"><span>◆</span></div>
+        <div class="wc-match-big num" title="Estimated fit vs your taste profile — not a guarantee">${esc(String(Number(card.match) || 0))}<sup>%</sup></div>
+        <div class="wc-cap">${esc(cap)}</div>` : ""}
+      </div>
+      ${card.why ? `<div class="wc-why">${esc(card.why)}</div>` : ""}
+      ${card.pairing ? `<div class="wc-pair">🍽 ${esc(card.pairing)}</div>` : ""}
+      <a class="wc-buy" href="https://www.wine-searcher.com/find/${encodeURIComponent(card.name)}" target="_blank" rel="noopener noreferrer">Find online →</a>
+      ${scalesHtml(card.attrs)}
+      <div class="wc-actions">${RATE_BUTTONS_HTML}</div>
     </div>`;
   bindRateButtons(el, {
     name: card.name, region: card.region, grape: card.grape, type: card.type,
@@ -938,30 +974,36 @@ function showScanResultScreen(img, mode, result) {
 
 function srPickCard(pick, context) {
   const el = document.createElement("div");
-  el.className = "sr-pick";
-  const typeClass = { red: "t-red", white: "t-white", rose: "t-rose", sparkling: "t-spark", orange: "t-orange", dessert: "t-dessert" }[pick.type] || "t-red";
+  // Same proof-frame as wineCardEl — one card language app-wide (crop marks, hairlines,
+  // mono annotations); scan picks just carry extra rows (position, price verdict).
+  el.className = "wine-card";
   const pvLower = (pick.price_verdict || "").toLowerCase();
   const priceClass = pvLower.includes("great") ? "sr-price-great" : pvLower.includes("overpriced") ? "sr-price-bad" : "sr-price-ok";
-  const metaParts = [pick.grape, pick.region, pick.vintage].filter(Boolean);
+  const rank = Number(pick.rank) || 0;
+  const headLeft = [
+    rank ? `Pick ${String(rank).padStart(2, "0")}` : null,
+    [SommProfile.TYPE_LABELS[pick.type] || pick.type, pick.region].filter(Boolean).join(" — "),
+  ].filter(Boolean).join(" · ");
+  const sub = [pick.grape, pick.vintage, pick.label_price].filter(Boolean).join(" · ");
 
   el.innerHTML = `
-    <div class="sr-pick-head">
-      <span class="sr-rank">#${esc(String(Number(pick.rank) || 0))}</span>
-      <span class="wc-type ${typeClass}">${esc((SommProfile.TYPE_LABELS[pick.type] || pick.type || "wine").toUpperCase())}</span>
-      <span class="sr-match-pct" title="Estimated fit vs your taste profile — not a guarantee">${matchBadgeText(Number(pick.match) || 0)}</span>
-    </div>
-    <div class="sr-pick-name">${esc(pick.name)}</div>
-    <a class="wc-buy" href="https://www.wine-searcher.com/find/${encodeURIComponent(pick.name)}" target="_blank" rel="noopener noreferrer">Find online →</a>
-    <div class="sr-pick-meta">${esc(metaParts.join(" · "))}${pick.label_price ? ` · <strong>${esc(pick.label_price)}</strong>` : ""}</div>
-    ${pick.shelf_position ? `<div class="sr-position">📍 ${esc(pick.shelf_position)}</div>` : ""}
-    ${pick.match_reason ? `<div class="sr-why">✓ ${esc(pick.match_reason)}</div>` : ""}
-    ${pick.price_verdict ? `<div class="sr-price-row"><span class="sr-price ${priceClass}" title="AI estimate from training knowledge — not a live price lookup">Est.: ${esc(pick.price_verdict)}</span><span class="sr-price-caveat" title="AI estimate from training knowledge — not a live price lookup">not a live price check</span></div>` : ""}
-    ${pick.market_price_note ? `<div class="sr-market-note" title="AI estimate from training knowledge — not a live price lookup">🔍 Est. ${esc(pick.market_price_note)}</div>` : ""}
-    ${pick.pairing ? `<div class="wc-pair">🍽 ${esc(pick.pairing)}</div>` : ""}
-    <div class="wc-actions">
-      <button class="rate" data-r="love">♥ Loved it</button>
-      <button class="rate" data-r="ok">Fine</button>
-      <button class="rate" data-r="no">Not for me</button>
+    <span class="wc-cm"></span>
+    <div class="wc-inner">
+      <div class="wc-head">
+        <span class="microlabel">${esc(headLeft)}</span>
+        <span class="microlabel" style="color: var(--claret); flex: 0 0 auto;" title="Estimated fit vs your taste profile — not a guarantee">${matchBadgeText(Number(pick.match) || 0)}</span>
+      </div>
+      <div class="wc-center" style="padding-bottom: 6px;">
+        <div class="wc-name" style="font-size: 1.25rem;">${esc(pick.name)}</div>
+        ${sub ? `<div class="wc-sub num">${esc(sub)}</div>` : ""}
+      </div>
+      ${pick.shelf_position ? `<div class="sr-position"><span class="pos-label num">${esc(pick.shelf_position)}</span></div>` : ""}
+      ${pick.match_reason ? `<div class="sr-why">✓ ${esc(pick.match_reason)}</div>` : ""}
+      ${pick.price_verdict ? `<div class="sr-price-row"><span class="sr-price ${priceClass}" title="AI estimate from training knowledge — not a live price lookup">Est.: ${esc(pick.price_verdict)}</span><span class="sr-price-caveat" title="AI estimate from training knowledge — not a live price lookup">not a live price check</span></div>` : ""}
+      ${pick.market_price_note ? `<div class="sr-market-note" title="AI estimate from training knowledge — not a live price lookup">Est. — ${esc(pick.market_price_note)}</div>` : ""}
+      ${pick.pairing ? `<div class="wc-pair">🍽 ${esc(pick.pairing)}</div>` : ""}
+      <a class="wc-buy" href="https://www.wine-searcher.com/find/${encodeURIComponent(pick.name)}" target="_blank" rel="noopener noreferrer">Find online →</a>
+      <div class="wc-actions">${RATE_BUTTONS_HTML}</div>
     </div>`;
 
   bindRateButtons(el, { name: pick.name, region: pick.region, grape: pick.grape, type: pick.type, attrs: pick.attrs, price: pick.label_price }, context);
@@ -1294,7 +1336,7 @@ function renderYou() {
     : `<div class="signin-nudge">
         <p>Sign in to remember your palate across devices — your ratings and preferences travel with you.</p>
         <button class="btn btn-primary" id="you-signin">Sign in / Create account</button>
-        <p class="privacy-note">Signing in stores your chat history, ratings and taste profile in our cloud database (Supabase) indefinitely, tied to your account, so they can sync across devices. Nothing is shared or sold, and you can delete it anytime from this tab once signed in.</p>
+        <p class="privacy-note">Signing in syncs your taste profile, ratings and journal across your devices, and backs up your chat messages — all stored in our cloud database (Supabase) indefinitely, tied to your account. Nothing is shared or sold, and you can delete it anytime from this tab once signed in.</p>
       </div>`;
 
   wrap.innerHTML = authSection + `

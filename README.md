@@ -37,7 +37,7 @@ All users then get free AI instantly, with no API key management.
 
 ## Architecture
 
-Static PWA-style app, no build, no backend.
+Static PWA frontend (no build) plus a small Express backend proxy (`backend/`) that holds the API keys.
 
 ```
 src/

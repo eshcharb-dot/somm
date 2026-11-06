@@ -13,20 +13,20 @@
 - **Learning loop** — every wine card has 3 feedback buttons (Loved it / It was fine / Not for me). Each rating nudges the palate vector toward/away from that wine's attribute vector with a decaying learning rate. Confidence % grows with rating count.
 - Built from an 8-step onboarding quiz (proxy questions: coffee, chocolate, dinner pick...) — no wine knowledge required.
 
-### 2. AI Layer (Claude API, key in Settings)
+### 2. AI Layer (Claude via backend proxy, free for users — no key)
 - **Vera chat** — full conversational sommelier, profile injected into system prompt, mode-aware
 - **Photo analysis** — snap a bottle / shelf / wine list / food menu → vision analysis → ranked picks scored against the user's profile and budget, each as a rateable wine card
 - Wine cards come back as `<wine>{json}</wine>` blocks parsed into UI cards with feedback buttons → feeds the learning loop
 
 ## Three contexts
-| Mode | Question it answers | Without API key | With API key |
+| Mode | Question it answers | Offline / AI unavailable | With AI (backend) |
 |---|---|---|---|
 | Tonight | "What do I open / pair with dinner?" | Local engine: pairing rules + palate match from 48-style knowledge base | Vera, personalized |
 | Store | "Which bottle do I buy?" | Local engine: best style matches in budget + shopping list | Shelf photo → top 3 picks |
 | Restaurant | "What do I order?" | Local cheat-sheet by cuisine | Wine list photo → best value picks for your meal |
 
 ## Stack
-Static PWA (no build) → GitHub Pages. localStorage for profile/history/key. Claude API direct from browser (`anthropic-dangerous-direct-browser-access`), model `claude-opus-4-8`, vision via base64, images downscaled client-side to ≤1568px.
+Static PWA (no build) → GitHub Pages. localStorage for profile/history. AI calls go through the backend proxy (`backend/server.js`, `/api/ai`; holds the API keys, rate limits and daily budget), default model `claude-opus-4-8` (set in `callClaude`), vision via base64, images downscaled client-side to ≤1568px.
 
 ## Launch checklist
 - [x] Onboarding → initial profile

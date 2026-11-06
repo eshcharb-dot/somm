@@ -29,6 +29,7 @@ _Maintained by the Conductor. Agents update this every cycle._
 - [ ] Q-PR002-004 (urgent): Supabase project `somm` (lnrkstvkbpgjfjdwfgik) is INACTIVE/paused, so auth, ratings and in-app feedback are down for real users. OK for me to restore it (free tier, no cost expected)? Recommend: yes.
 
 ## Run Log
+- 2026-11-06 13:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; waiting on owner.
 - 2026-11-06 12:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; all remaining items need the owner.
 - 2026-11-06 11:10 — No actionable step: all remaining items need the owner (Q-PR002-001/003/004 open, no new DECISIONS). Supabase `somm` re-checked: still INACTIVE.
 - 2026-11-06 11:20 — Drafted docs/USER-TEST.md; found Supabase project `somm` paused (Q-PR002-004).
@@ -37,5 +38,4 @@ _Maintained by the Conductor. Agents update this every cycle._
 - 2026-11-06 10:08 — Browser suites pass (fixed stale browser-test.js: age-gate, removed Settings key step); top item still blocked on Q-PR002-003.
 - 2026-11-06 10:05 — Vercel CLI: Upstash env vars present but DB host NXDOMAIN (deleted); need new creds from owner (Q-PR002-003).
 - 2026-11-06 09:05 — Investigated urgent /api/ai 503: Vercel MCP 403 (team auth needed), CI logs expired; unit suites pass (frontend 27/27, backend 24/24). Fix still awaits owner (Q-PR002-002).
-- 2026-11-06 08:25 — Smoke test vs live backend: /health, auth, CORS pass; /api/ai valid-token call returns 503 (rate-limit store unavailable); Deploy Backend runs failing; CI green; Vercel MCP logs 403.
 - 2026-11-06 08:23 — STATUS.md created by Conductor init

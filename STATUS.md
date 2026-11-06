@@ -29,6 +29,7 @@ _Maintained by the Conductor. Agents update this every cycle._
 - [ ] Q-PR002-004 (urgent): Supabase project `somm` (lnrkstvkbpgjfjdwfgik) is INACTIVE/paused, so auth, ratings and in-app feedback are down for real users. OK for me to restore it (free tier, no cost expected)? Recommend: yes.
 
 ## Run Log
+- 2026-11-06 18:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; waiting on owner.
 - 2026-11-06 17:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; waiting on owner.
 - 2026-11-06 16:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; waiting on owner.
 - 2026-11-06 15:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; waiting on owner.
@@ -39,4 +40,3 @@ _Maintained by the Conductor. Agents update this every cycle._
 - 2026-11-06 11:20 — Drafted docs/USER-TEST.md; found Supabase project `somm` paused (Q-PR002-004).
 - 2026-11-06 11:05 — Reviewed Vera prompt vs persona (aligned); added output/prompt-test.js (offline 39/39 pass; --live ready once /api/ai is back).
 - 2026-11-06 10:14 — Aligned README + docs/PRODUCT.md with backend-proxy architecture (no user key, model per backend/server.js).
-- 2026-11-06 10:08 — Browser suites pass (fixed stale browser-test.js: age-gate, removed Settings key step); top item still blocked on Q-PR002-003.

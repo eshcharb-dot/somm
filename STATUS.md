@@ -29,6 +29,7 @@ _Maintained by the Conductor. Agents update this every cycle._
 - [ ] Q-PR002-004 (urgent): Supabase project `somm` (lnrkstvkbpgjfjdwfgik) is INACTIVE/paused, so auth, ratings and in-app feedback are down for real users. OK for me to restore it (free tier, no cost expected)? Recommend: yes.
 
 ## Run Log
+- 2026-11-06 14:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; waiting on owner.
 - 2026-11-06 13:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; waiting on owner.
 - 2026-11-06 12:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; all remaining items need the owner.
 - 2026-11-06 11:10 — No actionable step: all remaining items need the owner (Q-PR002-001/003/004 open, no new DECISIONS). Supabase `somm` re-checked: still INACTIVE.

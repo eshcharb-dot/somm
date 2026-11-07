@@ -10,7 +10,7 @@ _Maintained by the Conductor. Agents update this every cycle._
 - Close Q-PR002-002 as superseded by Q-PR002-003. Then stop: remaining items need the owner — do not log idle hourly checks.
 
 ## Next Steps
-- [ ] (2026-11-07, unblocked) Root-cause the `deploy-backend.yml` CI failure: `gh run rerun` for fresh logs; fix config/secret drift if that's the cause.
+- [x] Root-caused `deploy-backend.yml` CI failure (2026-11-07): fresh workflow_dispatch run 42354062954 fails at `vercel pull` — repo secrets VERCEL_TOKEN/VERCEL_ORG_ID/VERCEL_PROJECT_ID are empty/missing (`gh secret list` is empty). Needs owner: Q-PR002-005.
 - [ ] (2026-11-07, unblocked) Branch-only prototype of a no-Upstash fallback limiter for /api/ai (not deployed); add as option (b) in Q-PR002-003 with cost risk.
 - [ ] URGENT (BLOCKED on Q-PR002-003: needs new Upstash DB): restore prod /api/ai (503 "Rate limiting temporarily unavailable") — check Upstash env vars on Vercel project `backend` and why `deploy-backend.yml` fails on every push since 2026-07-03 (logs expired; re-run workflow or use `vercel logs` CLI); re-run smoke test after fix. Also scheduled-health-check last ran 2026-09-03 (stale?)
 - [x] Browser suites run 2026-11-06: pairing-test OK; browser-test OK after fixing stale steps (age-gate checkbox, removed #set-key). Note: tests need a clean localStorage (dev-browser profile persists) and `--timeout 200`
@@ -32,7 +32,10 @@ _Maintained by the Conductor. Agents update this every cycle._
 
 - [ ] Q-PR002-004 (urgent): Supabase project `somm` (lnrkstvkbpgjfjdwfgik) is INACTIVE/paused, so auth, ratings and in-app feedback are down for real users. OK for me to restore it (free tier, no cost expected)? Recommend: yes.
 
+- [ ] Q-PR002-005 (normal): Deploy Backend CI fails because GitHub repo secrets VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID are not set. Options: (a) you create a Vercel token (vercel.com/account/tokens) and I set all three via `gh secret set`; (b) skip CI deploy and keep deploying manually via Vercel CLI. Recommend (b) for now — low value until Q-PR002-003 is resolved.
+
 ## Run Log
+- 2026-11-07 10:05 — Root-caused Deploy Backend CI failure (empty Vercel secrets in GitHub repo, Q-PR002-005). Old run not rerunnable; dispatched fresh run.
 - 2026-11-06 19:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; waiting on owner.
 - 2026-11-06 18:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; waiting on owner.
 - 2026-11-06 17:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; waiting on owner.

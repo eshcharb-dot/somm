@@ -63,8 +63,10 @@ function logBackendError(context, err) {
 // hosts (e.g. `npm run dev` locally, or a long-lived container), where a single process really
 // is the whole picture.
 const IS_SERVERLESS = !!(process.env.VERCEL || process.env.NOW_REGION || process.env.AWS_LAMBDA_FUNCTION_NAME);
-const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
-const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+// KV_REST_API_* come from the Vercel Marketplace Upstash integration (somm-ratelimit, Nov 2026);
+// UPSTASH_REDIS_REST_* are the older manually-set names, kept as a fallback.
+const UPSTASH_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+const UPSTASH_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
 const HAS_DURABLE_STORE = !!(UPSTASH_URL && UPSTASH_TOKEN);
 
 if (IS_SERVERLESS && !HAS_DURABLE_STORE) {

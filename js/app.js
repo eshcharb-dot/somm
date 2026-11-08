@@ -92,7 +92,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 // ============================== ANDROID BACK BUTTON ==============================
-// switchTab()/showAuthModal()/showScanResultScreen() toggle plain hidden flags with no History
+// switchTab()/showScanResultScreen() toggle plain hidden flags with no History
 // API integration, which on Android means the hardware/gesture back button exits the installed
 // PWA entirely instead of closing an overlay or stepping back a tab. We push a history entry
 // whenever an overlay opens (or a tab changes), and a single popstate listener below closes
@@ -111,10 +111,6 @@ function bindBackButton() {
       if (resolve) resolve(false);
       return;
     }
-    if (!$("#auth-modal").hidden && !(st && st.sommOverlay === "auth")) {
-      hideAuthModal();
-      return;
-    }
     if (!$("#screen-scan-result").hidden && !(st && st.sommOverlay === "scanresult")) {
       hideScanResultScreen();
       return;
@@ -123,62 +119,6 @@ function bindBackButton() {
       switchTab(st.sommTab, true);
     }
   });
-}
-
-async function onAuthStateChange(event, user) {
-  if (event === "SIGNED_IN" && user) {
-    await syncProfileOnSignIn();
-    if (state.tab === "you") renderYou();
-  }
-  if (event === "SIGNED_OUT") {
-    if (state.tab === "you") renderYou();
-  }
-  if (event === "PASSWORD_RECOVERY") {
-    // User clicked the reset-password link from their email — Supabase already gave us a
-    // recovery session; prompt for a new password instead of silently signing them in.
-    showAuthModal();
-    setAuthView("newpw");
-  }
-}
-
-// Pull the cloud profile down BEFORE ever pushing this device's local profile up.
-// Without this, signing in on a second device blindly overwrote whatever palate/ratings
-// history the account already had in Supabase with this device's (possibly blank) local
-// profile — exactly the data loss the "your ratings travel with you" sign-in prompt promises
-// won't happen. If the cloud already has a richer profile (more rated wines), adopt it
-// locally instead of clobbering it; otherwise push this device's profile up as before.
-async function syncProfileOnSignIn() {
-  let cloud = null;
-  try { cloud = await SommDB.getProfile(); } catch (e) { console.warn("cloud profile fetch failed", e); }
-
-  if (cloud && (cloud.ratings_count || 0) > (state.profile.ratingCount || 0)) {
-    if (cloud.full_profile && typeof cloud.full_profile === "object") {
-      // Lossless restore: full_profile carries the entire client profile (journal/history,
-      // nos, type affinities, grape+region learnings, budget) — the palate-snapshot columns
-      // below only cover dims, which left second-device sign-ins with an empty journal
-      // despite the sign-in copy's promise. Keep the stricter of the two age confirmations.
-      const ageOk = state.profile.ageConfirmed || !!cloud.full_profile.ageConfirmed;
-      state.profile = Object.assign(SommProfile.defaultProfile(), cloud.full_profile);
-      state.profile.ageConfirmed = ageOk;
-    } else {
-      // Older cloud rows predate the full_profile column — partial restore is still better
-      // than clobbering the richer cloud data with a blank local profile.
-      state.profile.name = cloud.display_name || state.profile.name;
-      state.profile.dims = { ...state.profile.dims, ...(cloud.palate || {}) };
-      if (typeof cloud.adventurousness === "number") state.profile.adventure = cloud.adventurousness;
-      state.profile.ratingCount = cloud.ratings_count;
-    }
-    state.profile.onboarded = true;
-    SommProfile.saveProfile(state.profile);
-    if (cloud.currency) {
-      state.settings.currency = cloud.currency;
-      SommProfile.saveSettings(state.settings);
-    }
-    toast("Synced your profile from the cloud ✓");
-  } else {
-    SommDB.saveProfile(state.profile, state.settings);
-    toast("Profile synced to cloud ✓");
-  }
 }
 
 function bindGlobal() {
@@ -706,7 +646,6 @@ async function runScanAnalysis(img, mode) {
       // parse failed, and the user got an error blaming their photo after a 20s wait.
       // Backend hard-caps at 4096 regardless.
       messages, system, provider: "claude", model: "claude-opus-4-8", maxTokens: 3500,
-      authToken: SommAuth.getUser() ? await SommAuth.getAccessToken() : null,
     });
     const result = SommAI.parseScanResult(res.text);
     if (!result) {
@@ -727,26 +666,6 @@ async function runScanAnalysis(img, mode) {
     const msg = (err.message || "Analysis failed — try again.").replace(/\s*—\s*tap to try again\.?$/i, ".");
     showScanResultScreen(img, mode, { error: msg });
   }
-}
-
-const SCAN_NUDGE_KEY = "somm.scanNudge.v1";
-const SCAN_NUDGE_AT = 3;
-// Soft, early sign-in nudge — separate from the hard-wall prompt shown when the shared anon
-// budget is exhausted (see the isBudgetErr branch below). Waiting until that hard wall to ever
-// mention sign-in is a rough first impression for a brand-new user who just wanted one scan and
-// gets blocked by strangers on the same wifi. Firing once, after a few *successful* scans,
-// lets sign-in read as "keep this going" instead of "you're locked out." Guests only; fires
-// once ever (per device) via the `shown` flag.
-function shouldShowSignInNudge() {
-  return false; // accounts removed (anonymous device IDs only)
-  let s;
-  try { s = JSON.parse(localStorage.getItem(SCAN_NUDGE_KEY)) || {}; } catch (e) { s = {}; }
-  if (s.shown) return false;
-  s.count = (s.count || 0) + 1;
-  const fire = s.count >= SCAN_NUDGE_AT;
-  if (fire) s.shown = true;
-  localStorage.setItem(SCAN_NUDGE_KEY, JSON.stringify(s));
-  return fire;
 }
 
 // Mode-specific rotation of reassurance sub-lines for the scan loading screen — same idea as
@@ -890,13 +809,6 @@ function showScanResultScreen(img, mode, result) {
   }
 
   if (result.error) {
-    // The shared anon per-IP budget can be exhausted by several beta testers on the same
-    // wifi hitting the same daily cap — nudge sign-in (which gets its own, larger, per-account
-    // budget) rather than leaving people to assume the app itself is broken. Same nudge for the
-    // backend's REQUIRE_AUTH_FOR_VISION 401 ("sign in to analyze photos" — see backend/server.js),
-    // if that's ever turned on.
-    const isAuthPromptErr = /budget|limit|allowance|sign in/i.test(result.error);
-    const showSignIn = false; // accounts removed
     screen.innerHTML = `
       <div class="sr-wrap">
         <div class="sr-topbar">
@@ -909,8 +821,7 @@ function showScanResultScreen(img, mode, result) {
             <div class="vera-avatar">V</div>
             <div>
               <p>${esc(result.error)}</p>
-              ${showSignIn ? `<button class="btn btn-primary" style="margin-top:10px" id="sr-signin-fb">Sign in for your own budget →</button>` : ""}
-              ${img.b64 && !showSignIn ? `<button class="btn btn-primary" style="margin-top:10px" id="sr-retry">Try again</button>` : ""}
+              ${img.b64 ? `<button class="btn btn-primary" style="margin-top:10px" id="sr-retry">Try again</button>` : ""}
               <button class="btn btn-outline" style="margin-top:10px" id="sr-chat-fb">Try in chat instead →</button>
               <button class="btn btn-ghost" style="margin-top:10px" id="sr-feedback-fb">Something off? Tell Vera</button>
             </div>
@@ -921,11 +832,10 @@ function showScanResultScreen(img, mode, result) {
     // Retry with the SAME photo — the whole point of scan mode is not re-shooting while standing
     // in an aisle. Only offered when the full image is still in memory (img.b64; entries
     // re-opened from "Recent scans" only keep a display dataUrl) and when the error isn't a
-    // budget/auth wall, where retrying without signing in would just hit the same wall.
+    // budget wall, where retrying would just hit the same wall.
     const retryBtn = $("#sr-retry");
     if (retryBtn) retryBtn.addEventListener("click", () => runScanAnalysis(img, mode));
     $("#sr-chat-fb").addEventListener("click", () => openScanInChat(img, mode));
-    if (showSignIn) $("#sr-signin-fb").addEventListener("click", showAuthModal);
     $("#sr-feedback-fb").addEventListener("click", async () => {
       const msg = await sommPrompt("What went wrong? (a couple of words is plenty)", { placeholder: "e.g. wrong vintage, bad match…" });
       if (!msg) return;
@@ -937,7 +847,6 @@ function showScanResultScreen(img, mode, result) {
 
   const picks = result.picks || [];
   const picksHeading = { bottle: "The verdict", menu: "Wine pairings", list: "Best picks", shelf: "Grab these" }[mode] || "Your picks";
-  const showSignInNudge = shouldShowSignInNudge();
 
   screen.innerHTML = `
     <div class="sr-wrap">
@@ -954,16 +863,11 @@ function showScanResultScreen(img, mode, result) {
         ${picks.length ? `<h3 class="sr-picks-head">${esc(picksHeading)}</h3>` : ""}
         <div id="sr-picks-list"></div>
         <button class="btn btn-outline btn-block" id="sr-chat-cta">Ask Vera for more →</button>
-        ${showSignInNudge ? `<div class="signin-nudge" style="margin-top:14px">
-          <p>Liking Vera so far? Sign in to keep your taste profile and ratings across devices — and get your own daily usage allowance instead of sharing one with everyone on this wifi.</p>
-          <button class="btn btn-primary" id="sr-signin-nudge">Sign in / Create account</button>
-        </div>` : ""}
       </div>
     </div>`;
 
   const picksWrap = $("#sr-picks-list");
   picks.forEach((pick) => picksWrap.appendChild(srPickCard(pick, mode)));
-  if (showSignInNudge) $("#sr-signin-nudge").addEventListener("click", showAuthModal);
 
   $("#sr-back").addEventListener("click", closeScanResultScreen);
   $("#sr-chat-cta").addEventListener("click", () => openScanInChat(img, mode, picks[0]));
@@ -1244,7 +1148,6 @@ async function requestVeraReply(text, image) {
       provider: "claude",
       model: image ? "claude-opus-4-8" : "claude-sonnet-5",
       maxTokens: 1500,
-      authToken: SommAuth.getUser() ? await SommAuth.getAccessToken() : null,
     });
     const { prose, cards } = SommAI.parseWineCards(res.text);
     state.chat.push({ role: "assistant", text: prose, cards });
@@ -1508,7 +1411,7 @@ function openDlg({ message, isPrompt, placeholder, value, confirmLabel, cancelLa
 }
 
 // Raw hide — used both by popstate (browser already moved past our pushed entry) and by
-// closeDlg() below. Mirrors hideAuthModal()'s focus-restore behavior.
+// closeDlg() below. Restores focus on close.
 function hideDlg() {
   const modal = $("#dlg-modal");
   if (modal.hidden) return;
@@ -1526,7 +1429,7 @@ function closeDlg(result) {
   if (history.state && history.state.sommOverlay === "dlg") {
     // The dialog can be opened ON TOP of the scan-result error screen (the "Something off?
     // Tell Vera" fallback) — if that screen is still open underneath, the replaced entry must
-    // stay tagged as the scan-result overlay, same reasoning as closeAuthModal.
+    // stay tagged as the scan-result overlay, so back still closes it in one step.
     const under = $("#screen-scan-result").hidden ? { sommTab: state.tab } : { sommOverlay: "scanresult" };
     history.replaceState(under, "");
   }
@@ -1598,202 +1501,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// ============================== AUTH MODAL ==============================
-let authPrevFocus = null; // element to return focus to when the modal closes
-
-// Focusable elements within container, in DOM/tab order — used for the modal's focus trap.
+// ============================== FOCUS HELPERS ==============================
+// Focusable elements within container, in DOM/tab order — used by the dialog focus traps.
 function focusableEls(container) {
   return $$('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])', container)
     .filter((el) => !el.hidden && el.offsetParent !== null);
 }
 
-function showAuthModal() {
-  const modal = $("#auth-modal");
-  if (!modal.hidden) return; // already open
-  authPrevFocus = document.activeElement;
-  modal.hidden = false;
-  history.pushState({ sommOverlay: "auth" }, "");
-  const first = focusableEls($(".auth-card"))[0];
-  (first || $(".auth-card")).focus();
-}
-
-// Raw hide — used both by popstate (browser already moved past our pushed entry) and by
-// closeAuthModal() below. Restores focus to whatever had it before the modal opened, since a
-// screen-reader/keyboard user's context would otherwise be silently lost.
-function hideAuthModal() {
-  const modal = $("#auth-modal");
-  if (modal.hidden) return;
-  modal.hidden = true;
-  if (authPrevFocus && typeof authPrevFocus.focus === "function") authPrevFocus.focus();
-  authPrevFocus = null;
-}
-
-// UI-triggered close (X button, backdrop, "continue without signing in", successful
-// sign-in/up). Replaces (rather than pops) the pushed "auth" history entry so the back stack
-// doesn't grow on repeated opens, without the async race a history.back() here would risk if
-// the caller immediately does more navigation afterward (e.g. nothing currently does, but
-// keeping this symmetric with closeScanResultScreen avoids that footgun for future callers).
-function closeAuthModal() {
-  if ($("#auth-modal").hidden) return;
-  hideAuthModal();
-  if (history.state && history.state.sommOverlay === "auth") {
-    // Auth can be opened ON TOP of the scan-result error screen (see the "Sign in for your own
-    // budget" fallback) — if that screen is still open underneath, the replaced entry must stay
-    // tagged as the scan-result overlay, not collapse to a bare tab entry, so a follow-up back
-    // press still closes it in one step instead of doing nothing.
-    const under = $("#screen-scan-result").hidden ? { sommTab: state.tab } : { sommOverlay: "scanresult" };
-    history.replaceState(under, "");
-  }
-}
-
-// Keyboard trap: Tab/Shift+Tab cycle within the modal instead of escaping to page content
-// behind the overlay, and Escape closes it — standard dialog behavior for keyboard/screen-
-// reader users, which #auth-modal previously had none of (no role=dialog either, fixed below).
-document.addEventListener("keydown", (e) => {
-  if ($("#auth-modal").hidden) return;
-  if (e.key === "Escape") { closeAuthModal(); return; }
-  if (e.key !== "Tab") return;
-  const focusable = focusableEls($(".auth-card"));
-  if (!focusable.length) return;
-  const first = focusable[0];
-  const last = focusable[focusable.length - 1];
-  if (e.shiftKey && document.activeElement === first) {
-    e.preventDefault();
-    last.focus();
-  } else if (!e.shiftKey && document.activeElement === last) {
-    e.preventDefault();
-    first.focus();
-  }
-});
-
-// Switches which sub-view of the auth modal is visible: "signin" (sign in/up form),
-// "forgot" (request a reset email), "sent" (confirmation), or "newpw" (set a new password,
-// reached via the emailed recovery link — see onAuthStateChange's PASSWORD_RECOVERY handler).
-function setAuthView(view) {
-  $("#auth-tab-row").hidden = view !== "signin";
-  $("#auth-form").hidden = view !== "signin";
-  $("#auth-forgot-link").hidden = view !== "signin";
-  $("#auth-oauth-block").hidden = view !== "signin";
-  $("#auth-forgot-view").hidden = view !== "forgot";
-  $("#auth-forgot-sent").hidden = view !== "sent";
-  $("#auth-newpw-view").hidden = view !== "newpw";
-}
-
-function bindAuthModal() {
-  let mode = "signin";
-  setAuthView("signin");
-
-  function setMode(m) {
-    mode = m;
-    $("#at-signin").classList.toggle("active", m === "signin");
-    $("#at-signup").classList.toggle("active", m === "signup");
-    $("#auth-name-wrap").hidden = m === "signin";
-    $("#auth-submit").textContent = m === "signin" ? "Sign in" : "Create account";
-    // new-password tells password managers to OFFER a generated password on signup instead of
-    // autofilling the existing one; the min-length hint shows Supabase's rule up front rather
-    // than as a rejection after submit.
-    $("#auth-password").setAttribute("autocomplete", m === "signin" ? "current-password" : "new-password");
-    $("#auth-pw-hint").hidden = m === "signin";
-    const err = $("#auth-error");
-    err.hidden = true;
-    err.textContent = "";
-  }
-
-  $("#at-signin").addEventListener("click", () => setMode("signin"));
-  $("#at-signup").addEventListener("click", () => setMode("signup"));
-  $("#auth-close").addEventListener("click", closeAuthModal);
-  $("#auth-skip").addEventListener("click", closeAuthModal);
-
-  $("#auth-google").addEventListener("click", async () => {
-    try { await SommAuth.signInWithGoogle(); }
-    catch (e) { showAuthError(e.message); }
-  });
-
-  $("#auth-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const email = $("#auth-email").value.trim();
-    const password = $("#auth-password").value;
-    const name = $("#auth-name").value.trim();
-    const btn = $("#auth-submit");
-    btn.disabled = true;
-    btn.textContent = mode === "signin" ? "Signing in…" : "Creating account…";
-    try {
-      if (mode === "signup") {
-        await SommAuth.signUp(email, password, name);
-        toast("Check your email to confirm your account!");
-        closeAuthModal();
-      } else {
-        await SommAuth.signIn(email, password);
-        closeAuthModal();
-      }
-    } catch (err) {
-      showAuthError(err.message);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = mode === "signin" ? "Sign in" : "Create account";
-    }
-  });
-
-  // ---- Forgot password ----
-  $("#auth-forgot-link").addEventListener("click", () => {
-    $("#auth-forgot-email").value = $("#auth-email").value.trim();
-    setAuthView("forgot");
-  });
-  $("#auth-forgot-back").addEventListener("click", () => setAuthView("signin"));
-  $("#auth-forgot-done").addEventListener("click", () => setAuthView("signin"));
-
-  $("#auth-forgot-submit").addEventListener("click", async () => {
-    const email = $("#auth-forgot-email").value.trim();
-    const errEl = $("#auth-forgot-error");
-    errEl.hidden = true;
-    if (!email) { errEl.textContent = "Enter your email first."; errEl.hidden = false; return; }
-    const btn = $("#auth-forgot-submit");
-    btn.disabled = true;
-    btn.textContent = "Sending…";
-    try {
-      await SommAuth.resetPasswordForEmail(email);
-      $("#auth-forgot-sent-email").textContent = email;
-      setAuthView("sent");
-    } catch (err) {
-      errEl.textContent = err.message;
-      errEl.hidden = false;
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Send reset link";
-    }
-  });
-
-  // ---- Set new password (reached from the emailed recovery link) ----
-  $("#auth-newpw-submit").addEventListener("click", async () => {
-    const pw = $("#auth-newpw").value;
-    const errEl = $("#auth-newpw-error");
-    errEl.hidden = true;
-    if (!pw || pw.length < 6) {
-      errEl.textContent = "Password must be at least 6 characters.";
-      errEl.hidden = false;
-      return;
-    }
-    const btn = $("#auth-newpw-submit");
-    btn.disabled = true;
-    btn.textContent = "Updating…";
-    try {
-      await SommAuth.updatePassword(pw);
-      toast("Password updated ✓");
-      $("#auth-newpw").value = "";
-      closeAuthModal();
-      setAuthView("signin");
-    } catch (err) {
-      errEl.textContent = err.message;
-      errEl.hidden = false;
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Update password";
-    }
-  });
-}
-
-function showAuthError(msg) {
-  const el = $("#auth-error");
-  el.textContent = msg;
-  el.hidden = false;
-}

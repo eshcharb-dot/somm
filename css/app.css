@@ -495,8 +495,6 @@ select.input { appearance: none; }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* ---------- auth modal ---------- */
-#auth-modal { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; }
-#auth-modal[hidden] { display: none; }
 .auth-overlay {
   position: absolute; inset: 0;
   background: rgba(34, 26, 21, .45); backdrop-filter: blur(4px); cursor: pointer;

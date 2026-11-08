@@ -39,9 +39,10 @@
   <ul>
     <li><strong>On-device:</strong> your taste profile, ratings, budget preferences and chat
       history are stored in your browser's local storage by default — no account required.</li>
-    <li><strong>If you sign in:</strong> the same data (chat history, ratings, taste profile) is
-      also stored in our cloud database (Supabase), tied to your account, so it can sync across
-      devices. Access is restricted to your account via row-level security.</li>
+    <li><strong>Anonymous cloud storage:</strong> there are no accounts. Each device gets a random
+      ID. When you rate a wine or send feedback, that rating/feedback (and, for feedback, the page
+      you were on) is stored on our backend (Upstash Redis) under that random ID — not tied to your
+      name or email. Your taste profile and chat history stay on your device.</li>
     <li><strong>Photos:</strong> when you scan a bottle, shelf, wine list or menu, the photo is
       sent to our backend and forwarded to Anthropic's Claude API for analysis. Photos are never
       stored on our servers; your recent scans (including the photo) are kept on your device
@@ -55,17 +56,15 @@
   <h2>What we don't do</h2>
   <ul>
     <li>We don't sell or share your data with third parties for advertising.</li>
-    <li>We don't require an account to use the core app — signing in is optional and only adds
-      cross-device sync.</li>
+    <li>We don't have accounts or ask for your email — nothing to sign up for.</li>
   </ul>
 
   <h2>Your controls</h2>
   <ul>
     <li><strong>Export</strong> your profile as JSON any time from the You tab.</li>
     <li><strong>Reset</strong> everything stored locally on this device from the You tab.</li>
-    <li><strong>Delete your cloud data</strong> permanently (chat history, ratings, taste
-      profile) from the You tab if you're signed in. This does not delete your sign-in account
-      itself.</li>
+    <li><strong>Delete your cloud data</strong> (the ratings stored under this device's random ID)
+      permanently from the You tab. Submitted feedback messages are kept for product improvement.</li>
   </ul>
 
   <h2>Terms</h2>

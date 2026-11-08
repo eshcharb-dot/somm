@@ -21,7 +21,9 @@ _Maintained by the Conductor. Agents update this every cycle._
 - [x] (2026-11-08) Q-PR002-006 approved (b): audited Supabase usage and wrote docs/STORAGE-PLAN.md (key schema, endpoints, client migration)
 - [x] (2026-11-08) Implemented backend POST /api/rating, /api/feedback, DELETE /api/me (KV, size caps, rate limits) + backend/test/storage.test.js; 31/31 tests pass. NOT yet deployed.
 - [x] (2026-11-08) Deployed backend via Vercel CLI (prod, alias backend-nu-ashen-76); smoke-test.js 4/4 and manual /api/rating, /api/feedback, DELETE /api/me OK on prod KV (one 'smoke test, ignore' feedback entry left in KV)
-- [ ] Switch client db.js to the new endpoints with anonymous device ID; drop login UI; bump SW cache; deploy and smoke test
+- [x] (2026-11-08) Client switched: new js/device.js (device ID + SommAuth guest shim), db.js -> backend endpoints (verified against prod from node: feedback/rating/delete ok), sign-in UI entry points removed, supabase script dropped, SW list updated. Committed locally, NOT pushed yet.
+- [ ] Browser-verify the client (dev-browser hung this cycle; run output/browser-test.js with clean profile, check no console errors, You tab shows no-account note), then `git push` to ship via Pages
+- [ ] Cleanup dead auth code: #auth-modal in index.html, bindAuthModal/showAuthModal/onAuthStateChange/syncProfileOnSignIn in app.js, supabase refs in sw.js/privacy.html/ai.js comments; update privacy copy
 - [ ] Run the phone test on a real device with the live app (needs owner)
 - [ ] Triage test feedback into prompt/UX fixes and iterate on Vera prompts (after owner feedback)
 
@@ -42,6 +44,7 @@ _Maintained by the Conductor. Agents update this every cycle._
 - [x] Q-PR002-005 (normal): Deploy Backend CI fails because GitHub repo secrets VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID are not set. Options: (a) you create a Vercel token (vercel.com/account/tokens) and I set all three via `gh secret set`; (b) skip CI deploy and keep deploying manually via Vercel CLI. Recommend (b) for now — low value until Q-PR002-003 is resolved.
 
 ## Run Log
+- 2026-11-08 18:17 — Migrated client off Supabase to anonymous device ID + backend endpoints (device.js, db.js, app.js You tab); node-checked, prod API calls OK; committed locally, push pending browser verification.
 - 2026-11-08 18:14 — Deployed backend with new storage endpoints to prod via Vercel CLI; smoke 4/4 + manual endpoint checks pass.
 - 2026-11-08 18:25 — Implemented /api/rating, /api/feedback, DELETE /api/me + storage tests (31/31 pass); committed, not yet deployed.
 - 2026-11-08 18:08 — Audited Supabase usage; wrote docs/STORAGE-PLAN.md (Upstash keys, /api/rating|feedback|me, client migration order).

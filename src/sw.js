@@ -17,7 +17,7 @@ const STATIC_ASSETS = [
   "/somm/js/data.js",
   "/somm/js/profile.js",
   "/somm/js/ai.js",
-  "/somm/js/auth.js",
+  "/somm/js/device.js",
   "/somm/js/db.js",
   "/somm/js/app.js",
   "/somm/manifest.json",

@@ -46,10 +46,9 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Network-first for API calls (backend + external APIs like Supabase, Frankfurter).
+  // Network-first for API calls (backend + external APIs like Frankfurter).
   const isAPI =
     url.hostname.includes("vercel.app") ||
-    url.hostname.includes("supabase") ||
     url.hostname.includes("frankfurter.app") ||
     url.pathname.startsWith("/api/");
 

@@ -9,12 +9,7 @@
 // proxy directly, bypassing origin checks. It only raises the bar for casual scraping.
 // The backend's real defenses are per-IP rate limiting, fail-closed Upstash-backed daily
 // budgets, and CORS (see backend/server.js) — this token alone was never meant to be the
-// whole story. Per-user auth is layered on top rather than replacing it: every call also
-// sends the signed-in user's Supabase JWT when available (see `authToken` below), which the
-// backend verifies server-side (verifySupabaseUser) to scope budgets per-account instead of
-// per-IP, and can additionally require (REQUIRE_AUTH_FOR_VISION, off by default for this
-// closed beta) for the most expensive request shape — photo scan/analysis. Turn that flag on
-// before widening the beta or going public.
+// whole story. There are no accounts; limits are per IP / device (see backend/server.js).
 const SOMM_CLIENT_TOKEN = "somm-2025";
 
 const BACKEND_URL = window.location.hostname === "localhost"
@@ -116,9 +111,7 @@ function buildSystemPrompt(profile, mode, currency) {
 }
 
 // Call backend AI proxy (no client-side keys needed).
-// `authToken` (optional) is the signed-in user's Supabase session JWT — sent so the backend
-// can verify identity server-side and scope abuse/rate limits to an account instead of only
-// an IP address. See SommAuth.getAccessToken() and backend/server.js#verifySupabaseUser.
+// `authToken` (optional, unused now that accounts are gone) is sent as a Bearer header if given.
 async function callAI({ messages, system, provider, model, maxTokens, authToken }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);

@@ -1,34 +1,23 @@
-# Somm — 10-minute phone test
+# Somm — 5-minute phone test
 
-**Before you start:** open https://eshcharb-dot.github.io/somm/ on your phone (Safari/Chrome). Optionally "Add to Home Screen". Don't read ahead; narrate what you think out loud. Tester needs no wine knowledge.
+Open https://eshcharb-dot.github.io/somm/ on your phone (optional: Add to Home Screen). No wine knowledge needed. Think out loud.
 
-## Script (about 10 min)
-| # | Task | What to watch for | OK? |
-|---|------|-------------------|-----|
-| 1 | Open the app, pass the age gate | Is it clear what Somm is in 5 seconds? | |
-| 2 | Take the taste quiz | Any confusing question? Does it feel too long? | |
-| 3 | Rate 5 wines (You/Scan tab) | Is rating easy? Does it feel rewarding? | |
-| 4 | Tonight tab: ask for a pairing ("pasta with mushrooms") | Are Vera's answers short, friendly, 1 question, max 3 cards? | |
-| 5 | Scan tab: photograph a bottle/shelf | Recognition right? Speed? Error handling? | |
-| 6 | Scan tab: photograph a restaurant wine list | Sensible picks for budget/taste? | |
-| 7 | Restaurant mode: ask "what should I order with the fish?" | Useful, non-snobby? | |
-| 8 | Chat with Vera for 2 min (free talk) | Tone, jargon, wrong facts | |
-| 9 | You tab > "Tell Vera →": send one feedback message | Does it confirm sent? (see check below) | |
+## Do these 6 things
+1. Open the app, pass the age gate. *Clear what it is in 5 seconds?*
+2. Take the taste quiz. *Too long? Anything confusing?*
+3. Tonight tab: ask "pasta with mushrooms". *Short, friendly, max 3 wines?*
+4. Scan tab: photo of a bottle or a wine list. *Right wine? Fast?*
+5. Chat with Vera for 1 min about anything. *Tone, jargon, wrong facts?*
+6. You tab > "Tell Vera →": send one message. *Did it confirm?*
 
-## Feedback capture template (one per tester)
-- Tester (first name / wine experience 1-5):
-- Device + browser:
-- First impression (one sentence):
-- Most confusing moment:
-- Best moment:
-- Wrong / weird Vera answers (quote them):
-- Would you use it again? When?
-- Bugs (screen, what you tapped):
-- Severity of each issue: blocker / annoying / nice-to-have
+## Send back (3 lines, text is fine)
+- Phone + browser:
+- Best moment / most confusing moment:
+- Anything Vera got wrong (quote it) or any bug (screen + what you tapped):
 
-## Feedback path check
-In-app feedback writes to the Supabase table `public.feedback` (`src/js/db.js#saveFeedback`, RLS insert-only). After step 9, confirm the row appears in the Supabase dashboard (project "somm"). Note: failures are swallowed with a console warning, so the UI may not show a problem.
+Plus: would you use it again, and when?
 
-## Prerequisites
-- Backend `/api/ai` must be working (steps 4-8 depend on it).
-- Supabase project "somm" must be active (free projects pause after inactivity).
+---
+## For the owner (not for testers)
+- Testers: you + 2-3 friends, ideally wine-casual. Current daily budget/rate limits stay as they are (DECISIONS 2026-11-08).
+- Prereq: `/api/ai` works (steps 3-5). Ratings/feedback storage is being moved from Supabase to Upstash (Q-PR002-006); until that ships, in-app feedback is NOT saved server-side, so collect it via the 3 lines above.

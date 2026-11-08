@@ -194,7 +194,7 @@ select.input { appearance: none; }
   to { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .wine-card, .auth-card, .dlg-card { animation: none; }
+  .wine-card, .dlg-card { animation: none; }
 }
 .wc-inner { background: var(--card); border: 1px solid var(--hair); }
 .wc-head {
@@ -493,45 +493,6 @@ select.input { appearance: none; }
   z-index: 99; max-width: 86vw; text-align: center;
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-/* ---------- auth modal ---------- */
-.auth-overlay {
-  position: absolute; inset: 0;
-  background: rgba(34, 26, 21, .45); backdrop-filter: blur(4px); cursor: pointer;
-}
-.auth-card {
-  position: relative; z-index: 1;
-  width: min(400px, 92vw); max-height: 88vh; overflow-y: auto;
-  background: var(--card); border: 1px solid var(--hair-strong); border-radius: 0;
-  padding: 26px 24px 20px;
-  animation: settle .28s cubic-bezier(.16, 1, .3, 1);
-}
-.auth-logo { font-family: var(--font-display); font-weight: 600; font-size: 1.8rem; margin-bottom: 16px; }
-.auth-tab-row {
-  display: flex; border: 1px solid var(--hair-strong); margin-bottom: 18px;
-}
-.auth-tab {
-  flex: 1; font: inherit; font-size: .88rem; font-weight: 600;
-  padding: 9px; border: none; cursor: pointer;
-  background: none; color: var(--muted); transition: all .15s ease;
-}
-.auth-tab.active { background: var(--ink); color: var(--bg); }
-.auth-err { color: var(--error-text); font-size: .86rem; margin: 8px 0 0; }
-.auth-divider {
-  display: flex; align-items: center; gap: 12px; margin: 14px 0 10px;
-  color: var(--muted); font-size: .8rem;
-}
-.auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--hair); }
-.google-btn {
-  display: flex; align-items: center; justify-content: center; gap: 10px;
-  width: 100%; padding: 12px; font: inherit; font-weight: 600; cursor: pointer;
-  background: var(--card); color: var(--ink); border: 1px solid var(--hair-strong); border-radius: 0;
-  transition: border-color .12s ease;
-}
-.google-btn:hover { border-color: var(--ink); }
-.auth-skip { display: block; width: 100%; text-align: center; margin-top: 4px; }
-.auth-forgot-link { display: block; margin: 2px auto 0; font-size: .84rem; padding: 6px; }
-.auth-forgot-copy { color: var(--ink-dim); font-size: .88rem; margin: 0 0 12px; }
 
 /* User card shown in You tab when logged in */
 .user-card {

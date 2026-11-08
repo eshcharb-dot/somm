@@ -9,7 +9,7 @@
 // live when they first installed the PWA, no matter how many fixes ship after that. If you
 // ever see the literal token below in production, the stamp step didn't run — treat that as a
 // deploy bug, not a working cache name.
-const CACHE_NAME = "somm-0bd5a305170bce40b01b24a49eaa847e3f69c161";
+const CACHE_NAME = "somm-537bfb5da76c2ba920434732b307f4e2a6f04eb0";
 
 const STATIC_ASSETS = [
   "/somm/",

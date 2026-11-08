@@ -48,6 +48,7 @@ _Maintained by the Conductor. Agents update this every cycle._
 - [x] Q-PR002-005 (normal): Deploy Backend CI fails because GitHub repo secrets VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID are not set. Options: (a) you create a Vercel token (vercel.com/account/tokens) and I set all three via `gh secret set`; (b) skip CI deploy and keep deploying manually via Vercel CLI. Recommend (b) for now — low value until Q-PR002-003 is resolved.
 
 ## Run Log
+- 2026-11-08 21:05 — Re-sampled live Vera after the 1cbeba1 rule: store/restaurant modes still sometimes show 2 questions (heuristic counts any '?', noisy); no more prompt churn, fold into owner-test triage.
 - 2026-11-08 20:06 — Live-sampled Vera (store asked 2 questions in 2/3 runs); hardened ai.js one-question rule, frontend tests 27/27, pushed 1cbeba1; waiting on owner phone test.
 - 2026-11-08 20:05 — Fixed live Vera prompt test harness (AbortController/fetch globals); live run vs prod: replies on-persona, store mode once asked 2 questions (single sample, fold into feedback triage).
 - 2026-11-08 19:08 — Prod backend smoke test 4/4 re-verified; nothing else agent-doable, waiting on owner phone test.

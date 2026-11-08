@@ -12,19 +12,22 @@ _Maintained by the Conductor. Agents update this every cycle._
 ## Next Steps
 - [x] Root-caused `deploy-backend.yml` CI failure (2026-11-07): fresh workflow_dispatch run 42354062954 fails at `vercel pull` — repo secrets VERCEL_TOKEN/VERCEL_ORG_ID/VERCEL_PROJECT_ID are empty/missing (`gh secret list` is empty). Needs owner: Q-PR002-005.
 - [x] (2026-11-07) Branch-only prototype `proto/no-upstash-fallback` (commit fb41b87, not pushed/deployed): opt-in env ALLOW_DEGRADED_LIMITER=1 lets serverless use per-instance in-memory limiter with daily budgets x0.25; default stays fail-closed. 24/24 backend tests pass. Added as option (b) to Q-PR002-003.
-- [ ] URGENT (BLOCKED on Q-PR002-003: needs new Upstash DB): restore prod /api/ai (503 "Rate limiting temporarily unavailable") — check Upstash env vars on Vercel project `backend` and why `deploy-backend.yml` fails on every push since 2026-07-03 (logs expired; re-run workflow or use `vercel logs` CLI); re-run smoke test after fix. Also scheduled-health-check last ran 2026-09-03 (stale?)
+- [x] (resolved 2026-11-07 by owner session; KV_* live, smoke 4/4; stale UPSTASH_* env vars removed 2026-11-08) restore prod /api/ai (503 "Rate limiting temporarily unavailable") — check Upstash env vars on Vercel project `backend` and why `deploy-backend.yml` fails on every push since 2026-07-03 (logs expired; re-run workflow or use `vercel logs` CLI); re-run smoke test after fix. Also scheduled-health-check last ran 2026-09-03 (stale?)
 - [x] Browser suites run 2026-11-06: pairing-test OK; browser-test OK after fixing stale steps (age-gate checkbox, removed #set-key). Note: tests need a clean localStorage (dev-browser profile persists) and `--timeout 200`
 - [x] Fix stale docs (done 2026-11-06): `docs/PRODUCT.md` still describes user-supplied key in Settings, direct-from-browser Claude calls and model `claude-opus-4-8`; README says "no backend" in Architecture but the backend proxy exists. Align both with the current backend-proxy architecture and the actual model in `backend/server.js`
 - [x] Reviewed Vera's prompt vs persona (aligned: short texts, one question, no snobbery, <=120 words, max 3 cards); added `output/prompt-test.js` (offline: 39 checks across 4 modes pass; `--live` runs sample chats once /api/ai is restored). Note: `output/` is gitignored, so the script is local only
 - [x] Drafted `docs/USER-TEST.md` (script + feedback template). End-to-end feedback check NOT done: Supabase project `somm` is INACTIVE (paused), see Q-PR002-004
+- [ ] Await owner answer to Q-PR002-006 (Supabase replacement plan); do NOT switch auth before approval
 - [ ] Run the phone test on a real device with the live app (needs owner)
 - [ ] Triage test feedback into prompt/UX fixes and iterate on Vera prompts (after owner feedback)
 
 ## Blockers
+- (Vercel MCP 403 note is obsolete; Vercel CLI works.)
 - Vercel MCP returns 403 for team menugenieai-9885s-projects (owner must approve authorize_team_access) so env vars/deploy logs are unreadable; GitHub Actions logs expired (410). Prod /api/ai fix needs owner (Q-PR002-002).
 - Real-device user test and feedback require the owner (no agent access to a phone).
 
 ## Open Questions
+- [ ] Q-PR002-006 (normal): Supabase replacement for auth/ratings/feedback. Options: (a) Neon Postgres via Vercel Marketplace + own simple auth endpoints in backend, (b) Upstash Redis only (ratings/feedback as keys, anonymous device IDs, drop accounts). Recovering old data needs a temporary restore, which you vetoed — OK to skip recovery? Recommend (b) + skip recovery for a small beta; (a) if accounts matter.
 - [ ] Q-PR002-001 (normal): Who runs the phone test and when? Options: (a) owner tests alone with the script in docs/USER-TEST.md, (b) owner plus 2-3 friends/wine-casual users. Recommendation: (b), as the app targets people with no wine knowledge. Also note: AI is free for all users via the backend proxy — OK to keep the current daily budget/rate limits during testing?
 - [x] (superseded by Q-PR002-003, 2026-11-07) Q-PR002-002 (urgent): Live Somm AI (chat/scan) returns 503 — Upstash Redis creds likely missing/expired on Vercel project `backend`, and Deploy Backend CI fails. Can you re-issue UPSTASH_REDIS_REST_URL/TOKEN (free tier fine) and set them in Vercel, or approve me doing it? Recommend: you re-issue and paste into Vercel env, then I redeploy and re-run the smoke test.
 
@@ -35,6 +38,7 @@ _Maintained by the Conductor. Agents update this every cycle._
 - [x] Q-PR002-005 (normal): Deploy Backend CI fails because GitHub repo secrets VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID are not set. Options: (a) you create a Vercel token (vercel.com/account/tokens) and I set all three via `gh secret set`; (b) skip CI deploy and keep deploying manually via Vercel CLI. Recommend (b) for now — low value until Q-PR002-003 is resolved.
 
 ## Run Log
+- 2026-11-08 06:53 — Removed stale UPSTASH_* Vercel env vars, gitignored .vercel/, added Q-PR002-006 (Supabase replacement plan).
 - 2026-11-07 10:09 — Prototyped opt-in no-Upstash degraded limiter on branch proto/no-upstash-fallback (tests 24/24); added option (b) to Q-PR002-003. Remaining items need owner.
 - 2026-11-07 10:05 — Root-caused Deploy Backend CI failure (empty Vercel secrets in GitHub repo, Q-PR002-005). Old run not rerunnable; dispatched fresh run.
 - 2026-11-06 19:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; waiting on owner.

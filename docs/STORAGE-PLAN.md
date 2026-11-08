@@ -12,7 +12,7 @@ Decision: DECISIONS.md 2026-11-08 17:41 (Q-PR002-006 b). Supabase is dropped; ol
 | `db.js` `logError` | insert `error_reports` | -> `POST /api/feedback` with `kind:"error"` (heavily capped) |
 | `db.js` `saveMessage` | insert `chat_messages` (full chat backup) | **Drop**. Chat stays in localStorage only (privacy win, nothing reads it). |
 | `db.js` `saveProfile` / `getProfile` | cloud profile sync across devices | **Drop**. No accounts means no cross-device sync; profile stays in localStorage. |
-| `db.js` `getCrowdFavorites` | rpc `get_crowd_favorites` (is it used in the UI? verify) | Optional later: `GET /api/favorites` from a sorted set `somm:fav`. Otherwise remove. |
+| `db.js` `getCrowdFavorites` | rpc `get_crowd_favorites` (verified: no callers outside db.js) | **Drop** (the `somm:fav` ZSET below is then not needed). |
 | `db.js` `deleteMyData` | delete user rows | -> `DELETE /api/me` (deletes the device's rating list). |
 | `app.js` ~86-190, 716, 748, 906, 1254, 1305-1343, 1480-1500, 1730-1820 | auth init, syncProfileOnSignIn, authToken to /api/ai, sign-in UI, password reset | Remove; keep the guest path (it is already the default). |
 | `index.html` L24, L203, `sw.js` L20-21, L52 | supabase-js CDN script, sign-in copy, SW cache + bypass | Remove script and auth modal; swap `auth.js` for `device.js` in the SW list; bump the cache version. |

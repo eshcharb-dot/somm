@@ -11,7 +11,24 @@ const http = require("http");
 // — the only three calls server.js makes (see upstashIncr/upstashIncrBy in server.js).
 function startFakeUpstash({ fail = false } = {}) {
   const counters = new Map();
+  const lists = new Map();
   const server = http.createServer((req, res) => {
+    if (!fail && req.method === "POST") {
+      // Command form: POST / with a JSON array body, e.g. ["LPUSH", key, value].
+      let raw = "";
+      req.on("data", (c) => (raw += c));
+      req.on("end", () => {
+        res.setHeader("content-type", "application/json");
+        const [cmd, key, ...rest] = JSON.parse(raw);
+        const list = lists.get(key) || [];
+        let result = 1;
+        if (cmd === "LPUSH") { list.unshift(rest[0]); lists.set(key, list); result = list.length; }
+        else if (cmd === "LTRIM") { lists.set(key, list.slice(Number(rest[0]), Number(rest[1]) + 1)); result = "OK"; }
+        else if (cmd === "DEL") { lists.delete(key); }
+        res.end(JSON.stringify({ result }));
+      });
+      return;
+    }
     if (fail) {
       // Simulate a real outage (connection reset), not just a non-2xx JSON error — server.js's
       // upstashIncr/upstashIncrBy don't check res.ok before parsing, so a clean JSON error body
@@ -55,7 +72,7 @@ function startFakeUpstash({ fail = false } = {}) {
   return new Promise((resolve) => {
     server.listen(0, "127.0.0.1", () => {
       const { port } = server.address();
-      resolve({ server, url: `http://127.0.0.1:${port}`, counters });
+      resolve({ server, url: `http://127.0.0.1:${port}`, counters, lists });
     });
   });
 }

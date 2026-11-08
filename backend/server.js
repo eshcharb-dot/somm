@@ -351,6 +351,101 @@ async function callGroq(messages, system, model, maxTokens) {
   return { text, usage: data.usage, stopReason: data.choices?.[0]?.finish_reason };
 }
 
+// ---- Anonymous ratings + feedback (Upstash Redis only; see docs/STORAGE-PLAN.md) ----
+const DEVICE_ID_RE = /^[0-9a-f-]{36}$/;
+const MAX_STORE_BODY_BYTES = 8 * 1024;
+
+async function upstashCmd(args) {
+  const r = await fetch(UPSTASH_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, "content-type": "application/json" },
+    body: JSON.stringify(args),
+  });
+  const data = await r.json();
+  if (!r.ok || data.error) throw new Error(data.error || `Upstash ${r.status}`);
+  return data.result;
+}
+
+function clip(v, n) { return typeof v === "string" ? v.slice(0, n) : ""; }
+
+// Shared guard for the storage routes: durable store required, body size cap, valid device ID,
+// per-IP/minute and per-device/day limits. Returns the deviceId, or null after sending a response.
+async function guardStore(req, res, route, perMinIp, perDayDevice) {
+  if (!HAS_DURABLE_STORE) { res.status(503).json({ error: "Storage temporarily unavailable" }); return null; }
+  if (JSON.stringify(req.body || {}).length > MAX_STORE_BODY_BYTES) { res.status(413).json({ error: "Body too large" }); return null; }
+  const deviceId = String(req.get("x-device-id") || "");
+  if (!DEVICE_ID_RE.test(deviceId)) { res.status(400).json({ error: "Missing or invalid X-Device-Id" }); return null; }
+  try {
+    const ipCount = await upstashIncr(`somm:rl:${route}:${req.ip}`, 60);
+    if (ipCount > perMinIp) { res.status(429).json({ error: "Too many requests" }); return null; }
+    const devCount = await upstashIncr(`somm:rld:${route}:${deviceId}:${todayKeyUTC()}`, 86400);
+    if (devCount > perDayDevice) { res.status(429).json({ error: "Daily limit reached" }); return null; }
+  } catch (e) {
+    console.warn("store guard failed:", e.message);
+    res.status(503).json({ error: "Storage temporarily unavailable" });
+    return null;
+  }
+  return deviceId;
+}
+
+app.post("/api/rating", async (req, res) => {
+  const deviceId = await guardStore(req, res, "rating", 30, 300);
+  if (!deviceId) return;
+  const b = req.body || {};
+  const w = b.wine && typeof b.wine === "object" ? b.wine : {};
+  const rating = Number(b.rating);
+  const name = clip(w.name, 200).trim();
+  if (!name || !Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return res.status(400).json({ error: "wine.name and integer rating 1-5 required" });
+  }
+  const entry = {
+    wine_name: name, type: clip(w.type, 50), region: clip(w.region, 200), grape: clip(w.grape, 200),
+    price: clip(String(w.price == null ? "" : w.price), 50), rating, context: clip(b.context, 200), ts: Date.now(),
+  };
+  const key = `somm:rating:${deviceId}`;
+  try {
+    await upstashCmd(["LPUSH", key, JSON.stringify(entry)]);
+    await upstashCmd(["LTRIM", key, "0", "499"]);
+    await upstashCmd(["EXPIRE", key, String(180 * 86400)]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.warn("rating store failed:", e.message);
+    res.status(503).json({ error: "Storage temporarily unavailable" });
+  }
+});
+
+app.post("/api/feedback", async (req, res) => {
+  const b0 = req.body || {};
+  const isError = b0.kind === "error";
+  const deviceId = await guardStore(req, res, isError ? "error" : "feedback", isError ? 10 : 5, isError ? 10 : 20);
+  if (!deviceId) return;
+  const message = clip(b0.message, 2000).trim();
+  if (!message) return res.status(400).json({ error: "message required" });
+  const entry = {
+    id: require("crypto").randomUUID(), deviceId, message, context: clip(b0.context, 100),
+    url: clip(b0.url, 300), kind: isError ? "error" : "feedback", ts: Date.now(),
+  };
+  try {
+    await upstashCmd(["LPUSH", "somm:feedback", JSON.stringify(entry)]);
+    await upstashCmd(["LTRIM", "somm:feedback", "0", "1999"]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.warn("feedback store failed:", e.message);
+    res.status(503).json({ error: "Storage temporarily unavailable" });
+  }
+});
+
+app.delete("/api/me", async (req, res) => {
+  const deviceId = await guardStore(req, res, "me", 5, 20);
+  if (!deviceId) return;
+  try {
+    await upstashCmd(["DEL", `somm:rating:${deviceId}`]);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(503).json({ error: "Storage temporarily unavailable" });
+  }
+});
+
 // Health check
 app.get("/health", (req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
 

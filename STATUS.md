@@ -17,7 +17,10 @@ _Maintained by the Conductor. Agents update this every cycle._
 - [x] Fix stale docs (done 2026-11-06): `docs/PRODUCT.md` still describes user-supplied key in Settings, direct-from-browser Claude calls and model `claude-opus-4-8`; README says "no backend" in Architecture but the backend proxy exists. Align both with the current backend-proxy architecture and the actual model in `backend/server.js`
 - [x] Reviewed Vera's prompt vs persona (aligned: short texts, one question, no snobbery, <=120 words, max 3 cards); added `output/prompt-test.js` (offline: 39 checks across 4 modes pass; `--live` runs sample chats once /api/ai is restored). Note: `output/` is gitignored, so the script is local only
 - [x] Drafted `docs/USER-TEST.md` (script + feedback template). End-to-end feedback check NOT done: Supabase project `somm` is INACTIVE (paused), see Q-PR002-004
-- [ ] Await owner answer to Q-PR002-006 (Supabase replacement plan); do NOT switch auth before approval
+- [x] (2026-11-08) Q-PR002-001 answered (b): rewrote docs/USER-TEST.md as a 5-min, 6-step phone test.
+- [ ] Q-PR002-006 approved (b): design Upstash-only storage. Audit src/js/db.js, auth.js, app.js Supabase usage; write docs/STORAGE-PLAN.md (key schema for ratings/feedback by anonymous device ID, new backend endpoints with rate limits, client migration, remove accounts UI)
+- [ ] Implement backend POST /api/rating and /api/feedback (KV, size caps, rate limit) + tests
+- [ ] Switch client db.js to the new endpoints with anonymous device ID; drop login UI; bump SW cache; deploy and smoke test
 - [ ] Run the phone test on a real device with the live app (needs owner)
 - [ ] Triage test feedback into prompt/UX fixes and iterate on Vera prompts (after owner feedback)
 
@@ -38,6 +41,7 @@ _Maintained by the Conductor. Agents update this every cycle._
 - [x] Q-PR002-005 (normal): Deploy Backend CI fails because GitHub repo secrets VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID are not set. Options: (a) you create a Vercel token (vercel.com/account/tokens) and I set all three via `gh secret set`; (b) skip CI deploy and keep deploying manually via Vercel CLI. Recommend (b) for now — low value until Q-PR002-003 is resolved.
 
 ## Run Log
+- 2026-11-08 18:05 — Acted on Q-001/006 answers: shortened USER-TEST.md to 5-min phone script; queued Upstash-only storage migration (plan, endpoints, client switch).
 - 2026-11-08 06:53 — Removed stale UPSTASH_* Vercel env vars, gitignored .vercel/, added Q-PR002-006 (Supabase replacement plan).
 - 2026-11-07 10:09 — Prototyped opt-in no-Upstash degraded limiter on branch proto/no-upstash-fallback (tests 24/24); added option (b) to Q-PR002-003. Remaining items need owner.
 - 2026-11-07 10:05 — Root-caused Deploy Backend CI failure (empty Vercel secrets in GitHub repo, Q-PR002-005). Old run not rerunnable; dispatched fresh run.

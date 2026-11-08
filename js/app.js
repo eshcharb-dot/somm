@@ -82,19 +82,12 @@ window.addEventListener("unhandledrejection", (e) => {
 document.addEventListener("DOMContentLoaded", async () => {
   loadChat();
   SommAI.initFxRates(); // non-blocking — rates cached for prompt injection
-  try {
-    await SommAuth.init(onAuthStateChange);
-  } catch (e) {
-    // Auth is optional — localStorage works without Supabase. Never block the boot.
-    console.warn("Auth init failed, continuing as guest:", e.message);
-  }
   if (!state.profile.onboarded) {
     showOnboarding();
   } else {
     showMain();
   }
   bindGlobal();
-  bindAuthModal();
   bindBackButton();
 });
 
@@ -745,7 +738,7 @@ const SCAN_NUDGE_AT = 3;
 // lets sign-in read as "keep this going" instead of "you're locked out." Guests only; fires
 // once ever (per device) via the `shown` flag.
 function shouldShowSignInNudge() {
-  if (SommAuth.getUser()) return false;
+  return false; // accounts removed (anonymous device IDs only)
   let s;
   try { s = JSON.parse(localStorage.getItem(SCAN_NUDGE_KEY)) || {}; } catch (e) { s = {}; }
   if (s.shown) return false;
@@ -903,7 +896,7 @@ function showScanResultScreen(img, mode, result) {
     // backend's REQUIRE_AUTH_FOR_VISION 401 ("sign in to analyze photos" — see backend/server.js),
     // if that's ever turned on.
     const isAuthPromptErr = /budget|limit|allowance|sign in/i.test(result.error);
-    const showSignIn = isAuthPromptErr && !SommAuth.getUser();
+    const showSignIn = false; // accounts removed
     screen.innerHTML = `
       <div class="sr-wrap">
         <div class="sr-topbar">
@@ -1302,8 +1295,6 @@ function renderYou() {
   const p = state.profile;
   const wrap = $("#you-content");
   const conf = SommProfile.confidencePct(p);
-  const user = SommAuth.getUser();
-
   const dimBars = SommProfile.DIM_KEYS.map((k) => `
     <div class="bar-row">
       <span class="bar-label">${SommProfile.DIM_LABELS[k]}</span>
@@ -1327,21 +1318,7 @@ function renderYou() {
       <span class="j-date">${new Date(h.ts).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
     </div>`).join("");
 
-  const authSection = user
-    ? `<div class="user-card">
-        <div class="user-avatar">${esc((user.email || "?")[0].toUpperCase())}</div>
-        <div class="user-info">
-          <div class="user-name">${esc(user.user_metadata?.display_name || p.name || user.email?.split("@")[0] || "Wine lover")}</div>
-          <div class="user-email">${esc(user.email || "")}</div>
-        </div>
-        <button class="btn-ghost" id="you-signout">Sign out</button>
-      </div>
-      <p class="privacy-note">Synced to the cloud: your chat history, ratings and taste profile. Stored in Supabase, tied to this account, kept until you delete it below.</p>`
-    : `<div class="signin-nudge">
-        <p>Sign in to remember your palate across devices — your ratings and preferences travel with you.</p>
-        <button class="btn btn-primary" id="you-signin">Sign in / Create account</button>
-        <p class="privacy-note">Signing in syncs your taste profile, ratings and journal across your devices, and backs up your chat messages — all stored in our cloud database (Supabase) indefinitely, tied to your account. Nothing is shared or sold, and you can delete it anytime from this tab once signed in.</p>
-      </div>`;
+  const authSection = `<p class="privacy-note">No account needed. Your chat and taste profile stay on this device. Ratings and feedback you send are stored anonymously and can be deleted below.</p>`;
 
   wrap.innerHTML = authSection + `
     <div class="you-head">
@@ -1406,7 +1383,7 @@ function renderYou() {
     <section class="panel danger-zone">
       <button class="btn-ghost" id="p-export">Export profile</button>
       <button class="btn-ghost" id="p-redo">Redo onboarding</button>
-      ${user ? `<button class="btn-ghost danger" id="p-delete-cloud">Delete my cloud data</button>` : ""}
+      <button class="btn-ghost danger" id="p-delete-cloud">Delete my server data</button>
       <button class="btn-ghost danger" id="p-reset">Reset everything</button>
       <a class="btn-ghost" href="privacy.html" target="_blank" rel="noopener noreferrer" style="display:block">Privacy &amp; Terms</a>
     </section>`;
@@ -1475,31 +1452,17 @@ function renderYou() {
     }
   });
 
-  if (user) {
-    $("#you-signout").addEventListener("click", async () => {
-      await SommAuth.signOut();
-      toast("Signed out");
-    });
-    const deleteBtn = $("#p-delete-cloud");
-    if (deleteBtn) deleteBtn.addEventListener("click", async () => {
-      const ok = await sommConfirm("Permanently delete your ratings, chat history and taste profile from our servers, sign you out, and reset this device? This can't be undone. (Your sign-in account itself is not deleted — you can create a fresh profile with the same email.)", { confirmLabel: "Delete permanently", danger: true });
-      if (!ok) return;
-      deleteBtn.disabled = true;
-      deleteBtn.textContent = "Deleting…";
-      const result = await SommDB.deleteMyData();
-      if (!result.ok) {
-        toast("Couldn't delete cloud data: " + (result.error || "unknown error"));
-        deleteBtn.disabled = false;
-        deleteBtn.textContent = "Delete my cloud data";
-        return;
-      }
-      await SommAuth.signOut();
-      clearAllLocalData();
-      location.reload();
-    });
-  } else {
-    $("#you-signin").addEventListener("click", () => showAuthModal());
-  }
+  const deleteBtn = $("#p-delete-cloud");
+  if (deleteBtn) deleteBtn.addEventListener("click", async () => {
+    const ok = await sommConfirm("Permanently delete the ratings this device has sent to our servers? Your local profile and chat are not affected.", { confirmLabel: "Delete", danger: true });
+    if (!ok) return;
+    deleteBtn.disabled = true;
+    deleteBtn.textContent = "Deleting…";
+    const result = await SommDB.deleteMyData();
+    deleteBtn.disabled = false;
+    deleteBtn.textContent = "Delete my server data";
+    toast(result.ok ? "Server data deleted ✓" : "Couldn't delete: " + (result.error || "unknown error"));
+  });
 }
 
 // Both destructive flows above must clear EVERY somm.* key, not just profile/chat/settings —

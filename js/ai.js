@@ -386,4 +386,4 @@ function convertToEUR(amount, currency) {
 
 function getFxRates() { return _fxCache.rates; }
 
-const SommAI = { initFxRates, buildSystemPrompt, buildScanSystemPrompt, parseScanResult, callAI, parseWineCards, prepareImage, convertFromEUR, convertToEUR, getFxRates };
+const SommAI = { BACKEND_URL, initFxRates, buildSystemPrompt, buildScanSystemPrompt, parseScanResult, callAI, parseWineCards, prepareImage, convertFromEUR, convertToEUR, getFxRates };

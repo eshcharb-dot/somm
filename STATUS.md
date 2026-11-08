@@ -23,7 +23,8 @@ _Maintained by the Conductor. Agents update this every cycle._
 - [x] (2026-11-08) Deployed backend via Vercel CLI (prod, alias backend-nu-ashen-76); smoke-test.js 4/4 and manual /api/rating, /api/feedback, DELETE /api/me OK on prod KV (one 'smoke test, ignore' feedback entry left in KV)
 - [x] (2026-11-08) Client switched: new js/device.js (device ID + SommAuth guest shim), db.js -> backend endpoints (verified against prod from node: feedback/rating/delete ok), sign-in UI entry points removed, supabase script dropped, SW list updated. Committed locally, NOT pushed yet.
 - [x] (2026-11-08) Browser-verified client (clear localStorage first; browser-test.js passes, only file:// CORS/SW console noise) and pushed c341c57 to Pages. TODO: re-check on live https URL once Pages rebuilds
-- [ ] Cleanup dead auth code: #auth-modal in index.html, bindAuthModal/showAuthModal/onAuthStateChange/syncProfileOnSignIn in app.js, supabase refs in sw.js/privacy.html/ai.js comments; update privacy copy
+- [x] (2026-11-08) Cleaned dead auth code (modal HTML/JS, sign-in nudge, supabase refs), rewrote privacy.html for anonymous device-ID storage; browser-test passes. Left: unused .auth-* CSS, backend verifySupabaseUser (harmless).
+- [ ] Re-check live https Pages URL after rebuild (no console errors, You tab, rating/feedback hit prod backend)
 - [ ] Run the phone test on a real device with the live app (needs owner)
 - [ ] Triage test feedback into prompt/UX fixes and iterate on Vera prompts (after owner feedback)
 
@@ -44,6 +45,7 @@ _Maintained by the Conductor. Agents update this every cycle._
 - [x] Q-PR002-005 (normal): Deploy Backend CI fails because GitHub repo secrets VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID are not set. Options: (a) you create a Vercel token (vercel.com/account/tokens) and I set all three via `gh secret set`; (b) skip CI deploy and keep deploying manually via Vercel CLI. Recommend (b) for now — low value until Q-PR002-003 is resolved.
 
 ## Run Log
+- 2026-11-08 18:24 — Removed dead Supabase auth code from client, updated privacy copy; browser-test passes; pushed 472bb42.
 - 2026-11-08 18:30 — Browser-verified migrated client (browser-test passes; console errors only file:// artifacts) and pushed to GitHub Pages.
 - 2026-11-08 18:17 — Migrated client off Supabase to anonymous device ID + backend endpoints (device.js, db.js, app.js You tab); node-checked, prod API calls OK; committed locally, push pending browser verification.
 - 2026-11-08 18:14 — Deployed backend with new storage endpoints to prod via Vercel CLI; smoke 4/4 + manual endpoint checks pass.

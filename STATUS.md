@@ -47,6 +47,7 @@ _Maintained by the Conductor. Agents update this every cycle._
 - [x] Q-PR002-005 (normal): Deploy Backend CI fails because GitHub repo secrets VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID are not set. Options: (a) you create a Vercel token (vercel.com/account/tokens) and I set all three via `gh secret set`; (b) skip CI deploy and keep deploying manually via Vercel CLI. Recommend (b) for now — low value until Q-PR002-003 is resolved.
 
 ## Run Log
+- 2026-11-08 19:08 — Prod backend smoke test 4/4 re-verified; nothing else agent-doable, waiting on owner phone test.
 - 2026-11-08 19:07 — Removed dead auth-modal CSS (40 lines) from app.css, pushed 537bfb5; remaining items need the owner (phone test).
 - 2026-11-08 19:05 — Live browser check of Pages clean except dead FX endpoint (301, no CORS); fixed to frankfurter.dev, node-checked, pushed 0bd5a30.
 - 2026-11-08 18:26 — Verified live Pages serves migrated client (200s, no Supabase refs, CORS preflight OK); only the owner phone test remains.

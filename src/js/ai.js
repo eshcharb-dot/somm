@@ -22,7 +22,7 @@ let _fxCache = { rates: null, ts: 0 };
 async function initFxRates() {
   if (_fxCache.rates && Date.now() - _fxCache.ts < 3_600_000) return; // 1-hour cache
   try {
-    const r = await fetch("https://api.frankfurter.app/latest?from=EUR");
+    const r = await fetch("https://api.frankfurter.dev/v1/latest?base=EUR");
     if (!r.ok) return;
     const d = await r.json();
     _fxCache = { rates: { EUR: 1, ...d.rates }, ts: Date.now() };

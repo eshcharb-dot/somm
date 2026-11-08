@@ -49,7 +49,7 @@ self.addEventListener("fetch", (event) => {
   // Network-first for API calls (backend + external APIs like Frankfurter).
   const isAPI =
     url.hostname.includes("vercel.app") ||
-    url.hostname.includes("frankfurter.app") ||
+    url.hostname.includes("frankfurter.dev") ||
     url.pathname.startsWith("/api/");
 
   if (isAPI) {

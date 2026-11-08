@@ -9,7 +9,7 @@
 // live when they first installed the PWA, no matter how many fixes ship after that. If you
 // ever see the literal token below in production, the stamp step didn't run — treat that as a
 // deploy bug, not a working cache name.
-const CACHE_NAME = "somm-472bb42b8b0940a503a1cb157fe009697e68bc5a";
+const CACHE_NAME = "somm-0bd5a305170bce40b01b24a49eaa847e3f69c161";
 
 const STATIC_ASSETS = [
   "/somm/",
@@ -49,7 +49,7 @@ self.addEventListener("fetch", (event) => {
   // Network-first for API calls (backend + external APIs like Frankfurter).
   const isAPI =
     url.hostname.includes("vercel.app") ||
-    url.hostname.includes("frankfurter.app") ||
+    url.hostname.includes("frankfurter.dev") ||
     url.pathname.startsWith("/api/");
 
   if (isAPI) {

@@ -20,7 +20,7 @@ _Maintained by the Conductor. Agents update this every cycle._
 - [x] (2026-11-08) Q-PR002-001 answered (b): rewrote docs/USER-TEST.md as a 5-min, 6-step phone test.
 - [x] (2026-11-08) Q-PR002-006 approved (b): audited Supabase usage and wrote docs/STORAGE-PLAN.md (key schema, endpoints, client migration)
 - [x] (2026-11-08) Implemented backend POST /api/rating, /api/feedback, DELETE /api/me (KV, size caps, rate limits) + backend/test/storage.test.js; 31/31 tests pass. NOT yet deployed.
-- [ ] Deploy backend with Vercel CLI (backwards-compatible) and smoke-test the new endpoints against prod KV
+- [x] (2026-11-08) Deployed backend via Vercel CLI (prod, alias backend-nu-ashen-76); smoke-test.js 4/4 and manual /api/rating, /api/feedback, DELETE /api/me OK on prod KV (one 'smoke test, ignore' feedback entry left in KV)
 - [ ] Switch client db.js to the new endpoints with anonymous device ID; drop login UI; bump SW cache; deploy and smoke test
 - [ ] Run the phone test on a real device with the live app (needs owner)
 - [ ] Triage test feedback into prompt/UX fixes and iterate on Vera prompts (after owner feedback)
@@ -42,6 +42,7 @@ _Maintained by the Conductor. Agents update this every cycle._
 - [x] Q-PR002-005 (normal): Deploy Backend CI fails because GitHub repo secrets VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID are not set. Options: (a) you create a Vercel token (vercel.com/account/tokens) and I set all three via `gh secret set`; (b) skip CI deploy and keep deploying manually via Vercel CLI. Recommend (b) for now — low value until Q-PR002-003 is resolved.
 
 ## Run Log
+- 2026-11-08 18:14 — Deployed backend with new storage endpoints to prod via Vercel CLI; smoke 4/4 + manual endpoint checks pass.
 - 2026-11-08 18:25 — Implemented /api/rating, /api/feedback, DELETE /api/me + storage tests (31/31 pass); committed, not yet deployed.
 - 2026-11-08 18:08 — Audited Supabase usage; wrote docs/STORAGE-PLAN.md (Upstash keys, /api/rating|feedback|me, client migration order).
 - 2026-11-08 18:05 — Acted on Q-001/006 answers: shortened USER-TEST.md to 5-min phone script; queued Upstash-only storage migration (plan, endpoints, client switch).

@@ -26,6 +26,7 @@ _Maintained by the Conductor. Agents update this every cycle._
 - [x] (2026-11-08) Cleaned dead auth code (modal HTML/JS, sign-in nudge, supabase refs), rewrote privacy.html for anonymous device-ID storage; browser-test passes. Left: unused .auth-* CSS, backend verifySupabaseUser (harmless).
 - [x] (2026-11-08) Live Pages re-checked via HTTP: index/device.js/db.js/privacy 200, no supabase refs, db.js uses backend endpoints, CORS preflight 204. Full in-browser console check not done.
 - [x] (2026-11-08) Live in-browser check of Pages: no page errors; found FX API api.frankfurter.app now 301s without CORS (live rates silently failing) -> switched to api.frankfurter.dev/v1, pushed 0bd5a30.
+- [x] (2026-11-08) Removed unused .auth-*/.google-btn CSS from app.css (braces balanced), pushed 537bfb5.
 - [ ] Run the phone test on a real device with the live app (needs owner)
 - [ ] Triage test feedback into prompt/UX fixes and iterate on Vera prompts (after owner feedback)
 
@@ -46,6 +47,7 @@ _Maintained by the Conductor. Agents update this every cycle._
 - [x] Q-PR002-005 (normal): Deploy Backend CI fails because GitHub repo secrets VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID are not set. Options: (a) you create a Vercel token (vercel.com/account/tokens) and I set all three via `gh secret set`; (b) skip CI deploy and keep deploying manually via Vercel CLI. Recommend (b) for now — low value until Q-PR002-003 is resolved.
 
 ## Run Log
+- 2026-11-08 19:07 — Removed dead auth-modal CSS (40 lines) from app.css, pushed 537bfb5; remaining items need the owner (phone test).
 - 2026-11-08 19:05 — Live browser check of Pages clean except dead FX endpoint (301, no CORS); fixed to frankfurter.dev, node-checked, pushed 0bd5a30.
 - 2026-11-08 18:26 — Verified live Pages serves migrated client (200s, no Supabase refs, CORS preflight OK); only the owner phone test remains.
 - 2026-11-08 18:24 — Removed dead Supabase auth code from client, updated privacy copy; browser-test passes; pushed 472bb42.

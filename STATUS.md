@@ -5,11 +5,14 @@ _Maintained by the Conductor. Agents update this every cycle._
 **Phase:** Post-build polish / awaiting real-device user test (12+ polish rounds done; latest commit "Match the Tonight greeting's question to the time of day")   **Tracker status:** Review
 
 ## Today's Goals
-- Root-cause why `deploy-backend.yml` fails on every push since 2026-07-03: re-run the workflow (`gh run rerun`) to get fresh logs, fix if it is config/secret-name drift; use the Vercel CLI per DECISIONS, not the MCP.
-- Prototype (branch only, not deployed) a fail-closed-safe fallback so /api/ai can run without Upstash (small in-memory per-instance limiter + existing daily budget cap); write the cost-risk trade-off into Q-PR002-003 as option (b).
-- Close Q-PR002-002 as superseded by Q-PR002-003. Then stop: remaining items need the owner — do not log idle hourly checks.
+- Fix the live prompt-test heuristic so it counts only questions in Vera's chat text (sentence-final '?'), not card bodies or quoted wine names. Re-run live once (3 samples per mode) and record the real 2-question rate. Make one targeted ai.js fix only if store or restaurant mode still fails 2 of 3; otherwise freeze the prompt until the owner's phone test.
+- Check `scheduled-health-check` (last ran 2026-09-03): point it at the current backend alias, or propose disabling it. No new secrets.
+- Add a forwardable 3-line invite to the top of docs/USER-TEST.md (live URL + 5-minute script) that the owner can send to 2-3 friends. Then stop: everything else waits on the phone test.
 
 ## Next Steps
+- [x] (2026-11-10) Precise one-question check (sentence-final ? in prose only, --samples=N); live 3x/mode: tonight [1,1,1], store [2,1,1], restaurant [1,0,1], chat [3,1,2]. Store fails 1/3, restaurant 0/3 -> below the 2-of-3 bar, prompt FROZEN until owner phone test (chat mode 2/3 over, not in scope; revisit in triage).
+- [x] (2026-11-10) scheduled-health-check already targets the current alias; GitHub auto-disabled it (disabled_inactivity), cannot dispatch. Re-enabling = hourly real /api/ai call (small spend) -> Q-PR002-007.
+- [x] (2026-11-10) Forwardable 3-line friend invite added at top of docs/USER-TEST.md; stale owner note on feedback storage fixed.
 - [x] Root-caused `deploy-backend.yml` CI failure (2026-11-07): fresh workflow_dispatch run 42354062954 fails at `vercel pull` — repo secrets VERCEL_TOKEN/VERCEL_ORG_ID/VERCEL_PROJECT_ID are empty/missing (`gh secret list` is empty). Needs owner: Q-PR002-005.
 - [x] (2026-11-07) Branch-only prototype `proto/no-upstash-fallback` (commit fb41b87, not pushed/deployed): opt-in env ALLOW_DEGRADED_LIMITER=1 lets serverless use per-instance in-memory limiter with daily budgets x0.25; default stays fail-closed. 24/24 backend tests pass. Added as option (b) to Q-PR002-003.
 - [x] (resolved 2026-11-07 by owner session; KV_* live, smoke 4/4; stale UPSTASH_* env vars removed 2026-11-08) restore prod /api/ai (503 "Rate limiting temporarily unavailable") — check Upstash env vars on Vercel project `backend` and why `deploy-backend.yml` fails on every push since 2026-07-03 (logs expired; re-run workflow or use `vercel logs` CLI); re-run smoke test after fix. Also scheduled-health-check last ran 2026-09-03 (stale?)
@@ -47,7 +50,10 @@ _Maintained by the Conductor. Agents update this every cycle._
 
 - [x] Q-PR002-005 (normal): Deploy Backend CI fails because GitHub repo secrets VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID are not set. Options: (a) you create a Vercel token (vercel.com/account/tokens) and I set all three via `gh secret set`; (b) skip CI deploy and keep deploying manually via Vercel CLI. Recommend (b) for now — low value until Q-PR002-003 is resolved.
 
+- [ ] Q-PR002-007 (low): Scheduled Health Check was auto-disabled by GitHub (inactivity); re-enabling runs hourly incl. one real /api/ai call (a few hundred tokens/hr). Options: (a) leave disabled until after the beta, (b) re-enable via `gh workflow enable` during the beta. Recommend (a) — smoke-test.js can be run by hand.
+
 ## Run Log
+- 2026-11-10 21:05 — Precise one-question test + live 3x/mode re-sample (store 1/3, restaurant 0/3 over -> prompt frozen); health-check workflow found auto-disabled (Q-PR002-007); friend invite added to USER-TEST.md.
 - 2026-11-08 21:05 — Re-sampled live Vera after the 1cbeba1 rule: store/restaurant modes still sometimes show 2 questions (heuristic counts any '?', noisy); no more prompt churn, fold into owner-test triage.
 - 2026-11-08 20:06 — Live-sampled Vera (store asked 2 questions in 2/3 runs); hardened ai.js one-question rule, frontend tests 27/27, pushed 1cbeba1; waiting on owner phone test.
 - 2026-11-08 20:05 — Fixed live Vera prompt test harness (AbortController/fetch globals); live run vs prod: replies on-persona, store mode once asked 2 questions (single sample, fold into feedback triage).

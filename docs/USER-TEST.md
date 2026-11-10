@@ -1,3 +1,10 @@
+# Forwardable invite (copy-paste to friends)
+> Hey! I built a wine-picking app with an AI sommelier called Vera, and I need 5 minutes of honest feedback.
+> Open https://eshcharb-dot.github.io/somm/ on your phone and try the 6 steps below (no wine knowledge needed).
+> Then text me 3 lines: your phone, the most confusing moment, anything Vera got wrong.
+
+---
+
 # Somm — 5-minute phone test
 
 Open https://eshcharb-dot.github.io/somm/ on your phone (optional: Add to Home Screen). No wine knowledge needed. Think out loud.
@@ -20,4 +27,4 @@ Plus: would you use it again, and when?
 ---
 ## For the owner (not for testers)
 - Testers: you + 2-3 friends, ideally wine-casual. Current daily budget/rate limits stay as they are (DECISIONS 2026-11-08).
-- Prereq: `/api/ai` works (steps 3-5). Ratings/feedback storage is being moved from Supabase to Upstash (Q-PR002-006); until that ships, in-app feedback is NOT saved server-side, so collect it via the 3 lines above.
+- Prereq: `/api/ai` works (steps 3-5). In-app feedback and ratings now save to the backend (anonymous device ID, shipped 2026-11-08); the 3 lines above are still the fallback.

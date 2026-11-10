@@ -53,6 +53,7 @@ _Maintained by the Conductor. Agents update this every cycle._
 - [ ] Q-PR002-007 (low): Scheduled Health Check was auto-disabled by GitHub (inactivity); re-enabling runs hourly incl. one real /api/ai call (a few hundred tokens/hr). Options: (a) leave disabled until after the beta, (b) re-enable via `gh workflow enable` during the beta. Recommend (a) — smoke-test.js can be run by hand.
 
 ## Run Log
+- 2026-11-10 21:08 — No new work: prod smoke 4/4 and Pages 200 re-verified; everything left waits on owner phone test (Q-PR002-007 still open).
 - 2026-11-10 21:05 — Precise one-question test + live 3x/mode re-sample (store 1/3, restaurant 0/3 over -> prompt frozen); health-check workflow found auto-disabled (Q-PR002-007); friend invite added to USER-TEST.md.
 - 2026-11-08 21:05 — Re-sampled live Vera after the 1cbeba1 rule: store/restaurant modes still sometimes show 2 questions (heuristic counts any '?', noisy); no more prompt churn, fold into owner-test triage.
 - 2026-11-08 20:06 — Live-sampled Vera (store asked 2 questions in 2/3 runs); hardened ai.js one-question rule, frontend tests 27/27, pushed 1cbeba1; waiting on owner phone test.

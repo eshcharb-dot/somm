@@ -5,11 +5,14 @@ _Maintained by the Conductor. Agents update this every cycle._
 **Phase:** Post-build polish / awaiting real-device user test (12+ polish rounds done; latest commit "Match the Tonight greeting's question to the time of day")   **Tracker status:** Review
 
 ## Today's Goals
-- Fix the live prompt-test heuristic so it counts only questions in Vera's chat text (sentence-final '?'), not card bodies or quoted wine names. Re-run live once (3 samples per mode) and record the real 2-question rate. Make one targeted ai.js fix only if store or restaurant mode still fails 2 of 3; otherwise freeze the prompt until the owner's phone test.
-- Check `scheduled-health-check` (last ran 2026-09-03): point it at the current backend alias, or propose disabling it. No new secrets.
-- Add a forwardable 3-line invite to the top of docs/USER-TEST.md (live URL + 5-minute script) that the owner can send to 2-3 friends. Then stop: everything else waits on the phone test.
+_Set by the Conductor 2026-11-13 07:00._
+- Read the prod KV feedback/rating keys once (read-only, via the backend or Vercel CLI; no secrets printed). Ignore the 'smoke test, ignore' entry. If any real tester feedback exists, start triage now instead of waiting for the owner to relay it.
+- Write `docs/FEEDBACK-TRIAGE.md`: a 1-page map from feedback type (too long / too many questions / wrong wine / snobbish / UX bug) to the exact ai.js prompt section or UI file to change, plus the re-test command. Then a phone-test result turns into a fix in one cycle.
+- Then stop. The prompt stays frozen; no smoke-test re-runs today (last 4/4 at 04:05).
 
 ## Next Steps
+- [ ] (2026-11-13) Read prod KV feedback/ratings: BLOCKED, `vercel env pull` returns KV vars empty (sensitive) and the backend has no read endpoint -> Q-PR002-008.
+- [x] (2026-11-13) docs/FEEDBACK-TRIAGE.md written: feedback type -> ai.js section / file -> re-test command (frontend tests 27/27).
 - [x] (2026-11-10) Precise one-question check (sentence-final ? in prose only, --samples=N); live 3x/mode: tonight [1,1,1], store [2,1,1], restaurant [1,0,1], chat [3,1,2]. Store fails 1/3, restaurant 0/3 -> below the 2-of-3 bar, prompt FROZEN until owner phone test (chat mode 2/3 over, not in scope; revisit in triage).
 - [x] (2026-11-10) scheduled-health-check already targets the current alias; GitHub auto-disabled it (disabled_inactivity), cannot dispatch. Re-enabling = hourly real /api/ai call (small spend) -> Q-PR002-007.
 - [x] (2026-11-10) Forwardable 3-line friend invite added at top of docs/USER-TEST.md; stale owner note on feedback storage fixed.
@@ -51,8 +54,10 @@ _Maintained by the Conductor. Agents update this every cycle._
 - [x] Q-PR002-005 (normal): Deploy Backend CI fails because GitHub repo secrets VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID are not set. Options: (a) you create a Vercel token (vercel.com/account/tokens) and I set all three via `gh secret set`; (b) skip CI deploy and keep deploying manually via Vercel CLI. Recommend (b) for now — low value until Q-PR002-003 is resolved.
 
 - [ ] Q-PR002-007 (low): Scheduled Health Check was auto-disabled by GitHub (inactivity); re-enabling runs hourly incl. one real /api/ai call (a few hundred tokens/hr). Options: (a) leave disabled until after the beta, (b) re-enable via `gh workflow enable` during the beta. Recommend (a) — smoke-test.js can be run by hand.
+- [ ] Q-PR002-008 (low): Agents can't read prod KV feedback (Vercel sensitive env vars pull empty). Options: (a) you relay feedback after the phone test, (b) I add a token-guarded read-only GET /api/admin/feedback using SOMM_TOKEN and deploy. Recommend (a) until real testers exist.
 
 ## Run Log
+- 2026-11-13 11:05 — Wrote docs/FEEDBACK-TRIAGE.md; KV feedback unreadable by agent (env pull returns empty secrets) -> Q-PR002-008.
 - 2026-11-13 04:05 — No new work: prod smoke 4/4 and Pages 200 re-verified; only owner phone test (and Q-PR002-007) remain.
 - 2026-11-12 21:32 — No new work: prod smoke 4/4 and Pages 200 re-verified; only owner phone test (and Q-PR002-007) remain.
 - 2026-11-12 11:09 — No new work: prod smoke 4/4 and Pages 200 re-verified; only owner phone test (and Q-PR002-007) remain.

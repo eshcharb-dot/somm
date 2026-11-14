@@ -5,10 +5,10 @@ _Maintained by the Conductor. Agents update this every cycle._
 **Phase:** Post-build polish / awaiting real-device user test (12+ polish rounds done; latest commit "Match the Tonight greeting's question to the time of day")   **Tracker status:** Review
 
 ## Today's Goals
-_Set by the Conductor 2026-11-13 07:00._
-- Read the prod KV feedback/rating keys once (read-only, via the backend or Vercel CLI; no secrets printed). Ignore the 'smoke test, ignore' entry. If any real tester feedback exists, start triage now instead of waiting for the owner to relay it.
-- Write `docs/FEEDBACK-TRIAGE.md`: a 1-page map from feedback type (too long / too many questions / wrong wine / snobbish / UX bug) to the exact ai.js prompt section or UI file to change, plus the re-test command. Then a phone-test result turns into a fix in one cycle.
-- Then stop. The prompt stays frozen; no smoke-test re-runs today (last 4/4 at 04:05).
+_Set by the Conductor 2026-11-14 19:36._
+- No cycles unless DECISIONS.md changes. No Pages or smoke re-checks: nothing has been deployed since 11-10.
+- If Q-PR002-008 = (b): add a token-guarded read-only GET /api/admin/feedback (SOMM_TOKEN, no PII in logs), write tests, deploy via the Vercel CLI, read the KV once, and start triage per docs/FEEDBACK-TRIAGE.md.
+- If the owner relays phone-test feedback: map each item through FEEDBACK-TRIAGE.md, then fix the top 1-2 items (the prompt unfreezes for those only), re-run prompt-test --live and the frontend tests, and push.
 
 ## Next Steps
 - [ ] (2026-11-13) Read prod KV feedback/ratings: BLOCKED, `vercel env pull` returns KV vars empty (sensitive) and the backend has no read endpoint -> Q-PR002-008.
@@ -57,6 +57,7 @@ _Set by the Conductor 2026-11-13 07:00._
 - [ ] Q-PR002-008 (low): Agents can't read prod KV feedback (Vercel sensitive env vars pull empty). Options: (a) you relay feedback after the phone test, (b) I add a token-guarded read-only GET /api/admin/feedback using SOMM_TOKEN and deploy. Recommend (a) until real testers exist.
 
 ## Run Log
+- 2026-11-14 20:05 — No new work: DECISIONS.md unchanged, Q-PR002-007/008 still open; waiting on owner phone test.
 - 2026-11-14 19:30 — No new work: Pages 200, tree clean, DECISIONS unchanged; only owner phone test and Q-PR002-007/008 remain.
 - 2026-11-13 12:05 — No new work: Pages 200, tree clean; only owner phone test and Q-PR002-007/008 remain.
 - 2026-11-13 11:14 — No new work: Pages 200, tree clean; only owner phone test and Q-PR002-007/008 remain.

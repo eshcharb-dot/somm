@@ -64,6 +64,8 @@ _Set by the Conductor 2026-11-15 08:48._
 - [x] Q-PR002-008 (low): Agents can't read prod KV feedback (Vercel sensitive env vars pull empty). Options: (a) you relay feedback after the phone test, (b) I add a token-guarded read-only GET /api/admin/feedback using SOMM_TOKEN and deploy. Recommend (a) until real testers exist.
 
 ## Run Log
+- 2026-11-15 14:05 — No new work: DECISIONS.md unchanged since 12:42; Android passes 1-3 live; waiting on owner Android re-test feedback.
+- 2026-11-15 13:23 — No new work: Android passes 1-3 shipped and verified live; DECISIONS.md unchanged; waiting on owner Android re-test feedback.
 - 2026-11-15 13:22 — Verified live Pages serves Android pass 3 (css identical after deploy finished); ready for owner re-test.
 - 2026-11-15 13:21 — Android pass 3 (Tonight/Scan/You): fixed You-tab budget row overflow at 200% font; pushed.
 - 2026-11-15 13:24 — Verified live Pages serves Android pass 2 (css identical); pass 3 (Tonight/You tabs) is next.

@@ -13,7 +13,8 @@ _Set by the Conductor 2026-11-15 08:48._
 ## Next Steps
 - [x] (2026-11-15) Android UI pass 1: fixed Vera tab double-padding/ragged right edge + page scroll, 44px tap targets (chips, starters, budget inputs, Find online), min 11px mono labels; 360x800 & 412x915 show 0 h-scroll, 0 small targets; tests 27/27; pushed (Pages auto-deploys). Screenshots in ~/.dev-browser/tmp/android/{before,after}-*.png; capture script output/android-capture.js.
 - [x] (2026-11-15) Live Pages verified: HTTP 200, live css/app.css byte-identical to pushed src. Owner re-test + before/after screenshots (~/.dev-browser/tmp/android/{before,after}-*.png) to be relayed by owner/Conductor.
-- [ ] Android UI pass 2: Scan results, onboarding quiz, and scan-result screens at 360/412 + 200% font scale; check card/typography polish.
+- [x] (2026-11-15) Android UI pass 2: onboarding/quiz/scan-result at 360/412/360@200% font: fixed card scales + head overflow at large fonts, 44px age-gate and privacy link; 0 h-scroll; tests 28/28; pushed. Screenshots ~/.dev-browser/tmp/android/p2{before,after}-*.png; script output/android-capture2.js.
+- [ ] Verify live Pages has pass 2, then send owner link + before/after screenshots (Conductor relays); remaining: Tonight/You tabs at 200% font.
 - [ ] (2026-11-13) Read prod KV feedback/ratings: BLOCKED, `vercel env pull` returns KV vars empty (sensitive) and the backend has no read endpoint -> Q-PR002-008.
 - [x] (2026-11-13) docs/FEEDBACK-TRIAGE.md written: feedback type -> ai.js section / file -> re-test command (frontend tests 27/27).
 - [x] (2026-11-10) Precise one-question check (sentence-final ? in prose only, --samples=N); live 3x/mode: tonight [1,1,1], store [2,1,1], restaurant [1,0,1], chat [3,1,2]. Store fails 1/3, restaurant 0/3 -> below the 2-of-3 bar, prompt FROZEN until owner phone test (chat mode 2/3 over, not in scope; revisit in triage).
@@ -60,6 +61,7 @@ _Set by the Conductor 2026-11-15 08:48._
 - [x] Q-PR002-008 (low): Agents can't read prod KV feedback (Vercel sensitive env vars pull empty). Options: (a) you relay feedback after the phone test, (b) I add a token-guarded read-only GET /api/admin/feedback using SOMM_TOKEN and deploy. Recommend (a) until real testers exist.
 
 ## Run Log
+- 2026-11-15 13:18 — Android UI pass 2 (onboarding, quiz, scan result, large-font overflow) fixed and pushed; tests 28/28.
 - 2026-11-15 13:16 — Verified live Pages serves the Android pass-1 CSS (identical to pushed); pass 2 is next.
 - 2026-11-15 13:05 — Android UI pass 1 (owner feedback): fixed Vera chat layout, tap targets, tiny labels; verified at 360/412, tests 27/27, pushed.
 - 2026-11-15 10:05 — No new work: DECISIONS.md unchanged, Today's Goals say no cycles; Q-PR002-007/008 still open, waiting on owner phone test.

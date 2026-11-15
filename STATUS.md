@@ -12,7 +12,7 @@ _Set by the Conductor 2026-11-15 08:48._
 
 ## Next Steps
 - [x] (2026-11-15) Android UI pass 1: fixed Vera tab double-padding/ragged right edge + page scroll, 44px tap targets (chips, starters, budget inputs, Find online), min 11px mono labels; 360x800 & 412x915 show 0 h-scroll, 0 small targets; tests 27/27; pushed (Pages auto-deploys). Screenshots in ~/.dev-browser/tmp/android/{before,after}-*.png; capture script output/android-capture.js.
-- [ ] Verify live Pages after deploy (Android emulation) and have owner re-test; owner to be sent link + before/after screenshots (outward message: owner/Conductor to relay).
+- [x] (2026-11-15) Live Pages verified: HTTP 200, live css/app.css byte-identical to pushed src. Owner re-test + before/after screenshots (~/.dev-browser/tmp/android/{before,after}-*.png) to be relayed by owner/Conductor.
 - [ ] Android UI pass 2: Scan results, onboarding quiz, and scan-result screens at 360/412 + 200% font scale; check card/typography polish.
 - [ ] (2026-11-13) Read prod KV feedback/ratings: BLOCKED, `vercel env pull` returns KV vars empty (sensitive) and the backend has no read endpoint -> Q-PR002-008.
 - [x] (2026-11-13) docs/FEEDBACK-TRIAGE.md written: feedback type -> ai.js section / file -> re-test command (frontend tests 27/27).
@@ -60,6 +60,7 @@ _Set by the Conductor 2026-11-15 08:48._
 - [x] Q-PR002-008 (low): Agents can't read prod KV feedback (Vercel sensitive env vars pull empty). Options: (a) you relay feedback after the phone test, (b) I add a token-guarded read-only GET /api/admin/feedback using SOMM_TOKEN and deploy. Recommend (a) until real testers exist.
 
 ## Run Log
+- 2026-11-15 13:16 — Verified live Pages serves the Android pass-1 CSS (identical to pushed); pass 2 is next.
 - 2026-11-15 13:05 — Android UI pass 1 (owner feedback): fixed Vera chat layout, tap targets, tiny labels; verified at 360/412, tests 27/27, pushed.
 - 2026-11-15 10:05 — No new work: DECISIONS.md unchanged, Today's Goals say no cycles; Q-PR002-007/008 still open, waiting on owner phone test.
 - 2026-11-15 03:05 — No new work: DECISIONS.md unchanged, Q-PR002-007/008 still open; waiting on owner phone test.

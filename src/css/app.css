@@ -423,10 +423,10 @@ select.input { appearance: none; }
 }
 .type-chip.off { opacity: .4; text-decoration: line-through; }
 
-.budget-row { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
-.budget-row label { flex: 0 0 86px; font-size: .88rem; color: var(--ink-dim); }
+.budget-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 9px; }
+.budget-row label { flex: 0 0 auto; min-width: 86px; font-size: .88rem; color: var(--ink-dim); }
 .budget-row input {
-  width: 76px; min-height: 44px; padding: 8px 10px; background: var(--card); color: var(--ink);
+  width: 76px; min-width: 0; flex: 0 1 76px; min-height: 44px; padding: 8px 10px; background: var(--card); color: var(--ink);
   border: 1px solid var(--hair-strong); border-radius: 0; font: inherit;
   font-variant-numeric: tabular-nums;
 }

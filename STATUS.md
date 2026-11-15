@@ -5,10 +5,10 @@ _Maintained by the Conductor. Agents update this every cycle._
 **Phase:** Post-build polish / awaiting real-device user test (12+ polish rounds done; latest commit "Match the Tonight greeting's question to the time of day")   **Tracker status:** Review
 
 ## Today's Goals
-_Set by the Conductor 2026-11-14 19:36._
-- No cycles unless DECISIONS.md changes. No Pages or smoke re-checks: nothing has been deployed since 11-10.
-- If Q-PR002-008 = (b): add a token-guarded read-only GET /api/admin/feedback (SOMM_TOKEN, no PII in logs), write tests, deploy via the Vercel CLI, read the KV once, and start triage per docs/FEEDBACK-TRIAGE.md.
-- If the owner relays phone-test feedback: map each item through FEEDBACK-TRIAGE.md, then fix the top 1-2 items (the prompt unfreezes for those only), re-run prompt-test --live and the frontend tests, and push.
+_Set by the Conductor 2026-11-15 08:48._
+- No cycles unless DECISIONS.md changes. Nothing deployed since 11-10; no Pages/smoke re-checks.
+- If Q-PR002-008 = (b): build token-guarded GET /api/admin/feedback (SOMM_TOKEN, no PII in logs), tests, Vercel CLI deploy, read KV once, start triage per docs/FEEDBACK-TRIAGE.md.
+- If phone-test feedback is relayed: triage via FEEDBACK-TRIAGE.md, fix the top 1-2 items, re-run prompt-test --live + frontend tests, push.
 
 ## Next Steps
 - [ ] (2026-11-13) Read prod KV feedback/ratings: BLOCKED, `vercel env pull` returns KV vars empty (sensitive) and the backend has no read endpoint -> Q-PR002-008.
@@ -57,6 +57,7 @@ _Set by the Conductor 2026-11-14 19:36._
 - [ ] Q-PR002-008 (low): Agents can't read prod KV feedback (Vercel sensitive env vars pull empty). Options: (a) you relay feedback after the phone test, (b) I add a token-guarded read-only GET /api/admin/feedback using SOMM_TOKEN and deploy. Recommend (a) until real testers exist.
 
 ## Run Log
+- 2026-11-15 10:05 — No new work: DECISIONS.md unchanged, Today's Goals say no cycles; Q-PR002-007/008 still open, waiting on owner phone test.
 - 2026-11-15 03:05 — No new work: DECISIONS.md unchanged, Q-PR002-007/008 still open; waiting on owner phone test.
 - 2026-11-14 20:05 — No new work: DECISIONS.md unchanged, Q-PR002-007/008 still open; waiting on owner phone test.
 - 2026-11-14 19:30 — No new work: Pages 200, tree clean, DECISIONS unchanged; only owner phone test and Q-PR002-007/008 remain.
@@ -66,37 +67,3 @@ _Set by the Conductor 2026-11-14 19:36._
 - 2026-11-13 04:05 — No new work: prod smoke 4/4 and Pages 200 re-verified; only owner phone test (and Q-PR002-007) remain.
 - 2026-11-12 21:32 — No new work: prod smoke 4/4 and Pages 200 re-verified; only owner phone test (and Q-PR002-007) remain.
 - 2026-11-12 11:09 — No new work: prod smoke 4/4 and Pages 200 re-verified; only owner phone test (and Q-PR002-007) remain.
-- 2026-11-12 00:05 — No new work: prod smoke 4/4 and Pages 200 re-verified; only owner phone test (and Q-PR002-007) remain.
-- 2026-11-11 17:05 — No new work: prod smoke 4/4 and Pages 200 re-verified; only owner phone test (and Q-PR002-007) remain.
-- 2026-11-11 10:05 — No new work: prod smoke 4/4 and Pages 200 re-verified; only owner phone test (and Q-PR002-007) remain.
-- 2026-11-10 22:05 — No new work: prod smoke 4/4 and Pages 200 re-verified; only owner phone test (and Q-PR002-007) remain.
-- 2026-11-10 21:08 — No new work: prod smoke 4/4 and Pages 200 re-verified; everything left waits on owner phone test (Q-PR002-007 still open).
-- 2026-11-10 21:05 — Precise one-question test + live 3x/mode re-sample (store 1/3, restaurant 0/3 over -> prompt frozen); health-check workflow found auto-disabled (Q-PR002-007); friend invite added to USER-TEST.md.
-- 2026-11-08 21:05 — Re-sampled live Vera after the 1cbeba1 rule: store/restaurant modes still sometimes show 2 questions (heuristic counts any '?', noisy); no more prompt churn, fold into owner-test triage.
-- 2026-11-08 20:06 — Live-sampled Vera (store asked 2 questions in 2/3 runs); hardened ai.js one-question rule, frontend tests 27/27, pushed 1cbeba1; waiting on owner phone test.
-- 2026-11-08 20:05 — Fixed live Vera prompt test harness (AbortController/fetch globals); live run vs prod: replies on-persona, store mode once asked 2 questions (single sample, fold into feedback triage).
-- 2026-11-08 19:08 — Prod backend smoke test 4/4 re-verified; nothing else agent-doable, waiting on owner phone test.
-- 2026-11-08 19:07 — Removed dead auth-modal CSS (40 lines) from app.css, pushed 537bfb5; remaining items need the owner (phone test).
-- 2026-11-08 19:05 — Live browser check of Pages clean except dead FX endpoint (301, no CORS); fixed to frankfurter.dev, node-checked, pushed 0bd5a30.
-- 2026-11-08 18:26 — Verified live Pages serves migrated client (200s, no Supabase refs, CORS preflight OK); only the owner phone test remains.
-- 2026-11-08 18:24 — Removed dead Supabase auth code from client, updated privacy copy; browser-test passes; pushed 472bb42.
-- 2026-11-08 18:30 — Browser-verified migrated client (browser-test passes; console errors only file:// artifacts) and pushed to GitHub Pages.
-- 2026-11-08 18:17 — Migrated client off Supabase to anonymous device ID + backend endpoints (device.js, db.js, app.js You tab); node-checked, prod API calls OK; committed locally, push pending browser verification.
-- 2026-11-08 18:14 — Deployed backend with new storage endpoints to prod via Vercel CLI; smoke 4/4 + manual endpoint checks pass.
-- 2026-11-08 18:25 — Implemented /api/rating, /api/feedback, DELETE /api/me + storage tests (31/31 pass); committed, not yet deployed.
-- 2026-11-08 18:08 — Audited Supabase usage; wrote docs/STORAGE-PLAN.md (Upstash keys, /api/rating|feedback|me, client migration order).
-- 2026-11-08 18:05 — Acted on Q-001/006 answers: shortened USER-TEST.md to 5-min phone script; queued Upstash-only storage migration (plan, endpoints, client switch).
-- 2026-11-08 06:53 — Removed stale UPSTASH_* Vercel env vars, gitignored .vercel/, added Q-PR002-006 (Supabase replacement plan).
-- 2026-11-07 10:09 — Prototyped opt-in no-Upstash degraded limiter on branch proto/no-upstash-fallback (tests 24/24); added option (b) to Q-PR002-003. Remaining items need owner.
-- 2026-11-07 10:05 — Root-caused Deploy Backend CI failure (empty Vercel secrets in GitHub repo, Q-PR002-005). Old run not rerunnable; dispatched fresh run.
-- 2026-11-06 19:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; waiting on owner.
-- 2026-11-06 18:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; waiting on owner.
-- 2026-11-06 17:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; waiting on owner.
-- 2026-11-06 16:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; waiting on owner.
-- 2026-11-06 15:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; waiting on owner.
-- 2026-11-06 14:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; waiting on owner.
-- 2026-11-06 13:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; waiting on owner.
-- 2026-11-06 12:05 — No actionable step: DECISIONS.md unchanged, Q-PR002-001/003/004 still open; all remaining items need the owner.
-- 2026-11-06 11:10 — No actionable step: all remaining items need the owner (Q-PR002-001/003/004 open, no new DECISIONS). Supabase `somm` re-checked: still INACTIVE.
-- 2026-11-06 11:20 — Drafted docs/USER-TEST.md; found Supabase project `somm` paused (Q-PR002-004).
-- 2026-11-06 11:05 — Reviewed Vera prompt vs persona (aligned); added output/prompt-test.js (offline 39/39 pass; --live ready once /api/ai is back).

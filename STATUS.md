@@ -18,6 +18,8 @@ _Set by the Conductor 2026-11-15 08:48._
 - [x] (2026-11-15) Android pass 3: Tonight/Scan/You at 360/412/360@200%: only defect was You-tab budget row overflowing 7px at 200% font; fixed (flex-wrap). 0 h-scroll, 0 small targets everywhere; tests pass. Screenshots ~/.dev-browser/tmp/android/p3{before,after}-*.png; script output/android-capture3.js.
 - [x] (2026-11-15) Live Pages serves pass 3 css (deploy success, diff identical). Conductor to relay https://eshcharb-dot.github.io/somm/ + screenshots ~/.dev-browser/tmp/android/{p3before,p3after}-*.png to owner for re-test.
 - [ ] Await owner Android re-test feedback; triage via docs/FEEDBACK-TRIAGE.md.
+- [x] (2026-11-15) Audited PWA Android basics: viewport-fit=cover, 10 safe-area rules, theme-color, standalone manifest, maskable icon all present; nothing to fix.
+- [ ] (optional, agent-doable) Dark-mode / prefers-reduced-motion check at 360x800 if owner reports visual issues after re-test.
 - [ ] (2026-11-13) Read prod KV feedback/ratings: BLOCKED, `vercel env pull` returns KV vars empty (sensitive) and the backend has no read endpoint -> Q-PR002-008.
 - [x] (2026-11-13) docs/FEEDBACK-TRIAGE.md written: feedback type -> ai.js section / file -> re-test command (frontend tests 27/27).
 - [x] (2026-11-10) Precise one-question check (sentence-final ? in prose only, --samples=N); live 3x/mode: tonight [1,1,1], store [2,1,1], restaurant [1,0,1], chat [3,1,2]. Store fails 1/3, restaurant 0/3 -> below the 2-of-3 bar, prompt FROZEN until owner phone test (chat mode 2/3 over, not in scope; revisit in triage).
@@ -64,6 +66,7 @@ _Set by the Conductor 2026-11-15 08:48._
 - [x] Q-PR002-008 (low): Agents can't read prod KV feedback (Vercel sensitive env vars pull empty). Options: (a) you relay feedback after the phone test, (b) I add a token-guarded read-only GET /api/admin/feedback using SOMM_TOKEN and deploy. Recommend (a) until real testers exist.
 
 ## Run Log
+- 2026-11-15 21:05 — No new work: DECISIONS.md unchanged since 12:42; audited PWA/safe-area basics (all fine); waiting on owner Android re-test feedback.
 - 2026-11-15 14:05 — No new work: DECISIONS.md unchanged since 12:42; Android passes 1-3 live; waiting on owner Android re-test feedback.
 - 2026-11-15 13:23 — No new work: Android passes 1-3 shipped and verified live; DECISIONS.md unchanged; waiting on owner Android re-test feedback.
 - 2026-11-15 13:22 — Verified live Pages serves Android pass 3 (css identical after deploy finished); ready for owner re-test.

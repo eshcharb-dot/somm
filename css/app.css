@@ -111,13 +111,13 @@ select.input { appearance: none; }
   font-size: .72rem; font-family: var(--font-mono);
 }
 .onb-agegate {
-  display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+  display: flex; align-items: center; gap: 10px; cursor: pointer; min-height: 44px;
   color: var(--ink-dim); font-size: .88rem; line-height: 1.4;
   touch-action: manipulation; user-select: none; -webkit-user-select: none;
 }
 .onb-agegate input[type="checkbox"] { width: 20px; height: 20px; flex: 0 0 auto; margin-top: 1px; accent-color: var(--claret); }
 .onb-legal { text-align: center; margin: 4px 0 0; }
-.onb-legal a { color: var(--muted); font-size: .78rem; text-decoration: underline; text-underline-offset: 3px; }
+.onb-legal a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; color: var(--muted); font-size: .78rem; text-decoration: underline; text-underline-offset: 3px; }
 .onb-legal a:hover { color: var(--claret); }
 
 .vera-intro, .vera-line { display: flex; gap: 10px; align-items: flex-start; }
@@ -203,8 +203,9 @@ select.input { appearance: none; }
 }
 .wc-head .microlabel {
   font-size: .7rem; letter-spacing: .2em; text-transform: uppercase; color: var(--claret);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0; overflow-wrap: anywhere;
 }
+.wc-head { flex-wrap: wrap; }
 .wc-head .microlabel.ctx { color: var(--muted); flex: 0 0 auto; }
 .wc-center { padding: 16px 16px 4px; text-align: center; }
 .wc-name { font-size: 1.42rem; line-height: 1.12; font-weight: 600; letter-spacing: -.005em; }
@@ -232,9 +233,10 @@ select.input { appearance: none; }
 }
 
 /* measurement rails — attribute scales */
-.scales { padding: 12px 16px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; }
+.scales { padding: 12px 16px 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: 10px 20px; }
+.scales > * { min-width: 0; }
 .scale-lab {
-  display: flex; justify-content: space-between;
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0 6px;
   font-family: var(--font-mono); font-size: .7rem; letter-spacing: .14em;
   text-transform: uppercase; color: var(--muted); margin-bottom: 5px;
 }

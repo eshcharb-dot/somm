@@ -12,3 +12,7 @@ _Append-only log of the owner's answers (from Telegram). Newest at the bottom. O
 - 2026-11-08 17:41 — Q-PR002-006: (b) Upstash Redis only: ratings and feedback as keys with anonymous device IDs, no accounts. Skip recovering old data.
 
 - 2026-11-08 17:43 — Q-PR002-001: (b) Owner plus 2-3 friends; keep the current daily budget/rate limits. Make the test script short and phone-friendly.
+
+- 2026-11-15 12:39 — Q-PR002-007: (b) re-enable during the beta. DONE 2026-11-15: 'Scheduled Health Check' enabled (hourly), manual run 43705081384 passed all 4 smoke checks against https://backend-nu-ashen-76.vercel.app. Owner wants to test the app on phone: https://eshcharb-dot.github.io/somm/ (200 OK).
+
+- 2026-11-15 12:42 — Q-PR002-008: (a) owner relays feedback. FEEDBACK 2026-11-15 from owner's Android phone test: 'looks terrible on android, needs improvement of the UI'. Next: full UI pass for Android (Chrome Android viewports ~360x800 / 412x915, safe areas, font scaling, touch targets, layout overflow) — run the ux-ui-agent skill at mobile breakpoints, fix, deploy, and send the owner the link + before/after screenshots.

@@ -11,6 +11,9 @@ _Set by the Conductor 2026-11-15 08:48._
 - If phone-test feedback is relayed: triage via FEEDBACK-TRIAGE.md, fix the top 1-2 items, re-run prompt-test --live + frontend tests, push.
 
 ## Next Steps
+- [x] (2026-11-15) Android UI pass 1: fixed Vera tab double-padding/ragged right edge + page scroll, 44px tap targets (chips, starters, budget inputs, Find online), min 11px mono labels; 360x800 & 412x915 show 0 h-scroll, 0 small targets; tests 27/27; pushed (Pages auto-deploys). Screenshots in ~/.dev-browser/tmp/android/{before,after}-*.png; capture script output/android-capture.js.
+- [ ] Verify live Pages after deploy (Android emulation) and have owner re-test; owner to be sent link + before/after screenshots (outward message: owner/Conductor to relay).
+- [ ] Android UI pass 2: Scan results, onboarding quiz, and scan-result screens at 360/412 + 200% font scale; check card/typography polish.
 - [ ] (2026-11-13) Read prod KV feedback/ratings: BLOCKED, `vercel env pull` returns KV vars empty (sensitive) and the backend has no read endpoint -> Q-PR002-008.
 - [x] (2026-11-13) docs/FEEDBACK-TRIAGE.md written: feedback type -> ai.js section / file -> re-test command (frontend tests 27/27).
 - [x] (2026-11-10) Precise one-question check (sentence-final ? in prose only, --samples=N); live 3x/mode: tonight [1,1,1], store [2,1,1], restaurant [1,0,1], chat [3,1,2]. Store fails 1/3, restaurant 0/3 -> below the 2-of-3 bar, prompt FROZEN until owner phone test (chat mode 2/3 over, not in scope; revisit in triage).
@@ -35,7 +38,7 @@ _Set by the Conductor 2026-11-15 08:48._
 - [x] (2026-11-08) Removed unused .auth-*/.google-btn CSS from app.css (braces balanced), pushed 537bfb5.
 - [ ] Run the phone test on a real device with the live app (needs owner)
 - [x] (2026-11-08) Live prompt-test showed 2-question replies in ~2/3 store runs; tightened ai.js rule to "at most ONE question per reply" (pushed 1cbeba1). Live samples still noisy (heuristic counts any ?): re-sample after owner test.
-- [ ] Triage test feedback into prompt/UX fixes and iterate on Vera prompts (after owner feedback)
+- [ ] (in progress, Android UI feedback 2026-11-15) Triage test feedback into prompt/UX fixes and iterate on Vera prompts (after owner feedback)
 
 ## Blockers
 - (Vercel MCP 403 note is obsolete; Vercel CLI works.)
@@ -53,10 +56,11 @@ _Set by the Conductor 2026-11-15 08:48._
 
 - [x] Q-PR002-005 (normal): Deploy Backend CI fails because GitHub repo secrets VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID are not set. Options: (a) you create a Vercel token (vercel.com/account/tokens) and I set all three via `gh secret set`; (b) skip CI deploy and keep deploying manually via Vercel CLI. Recommend (b) for now — low value until Q-PR002-003 is resolved.
 
-- [ ] Q-PR002-007 (low): Scheduled Health Check was auto-disabled by GitHub (inactivity); re-enabling runs hourly incl. one real /api/ai call (a few hundred tokens/hr). Options: (a) leave disabled until after the beta, (b) re-enable via `gh workflow enable` during the beta. Recommend (a) — smoke-test.js can be run by hand.
-- [ ] Q-PR002-008 (low): Agents can't read prod KV feedback (Vercel sensitive env vars pull empty). Options: (a) you relay feedback after the phone test, (b) I add a token-guarded read-only GET /api/admin/feedback using SOMM_TOKEN and deploy. Recommend (a) until real testers exist.
+- [x] Q-PR002-007 (low): Scheduled Health Check was auto-disabled by GitHub (inactivity); re-enabling runs hourly incl. one real /api/ai call (a few hundred tokens/hr). Options: (a) leave disabled until after the beta, (b) re-enable via `gh workflow enable` during the beta. Recommend (a) — smoke-test.js can be run by hand.
+- [x] Q-PR002-008 (low): Agents can't read prod KV feedback (Vercel sensitive env vars pull empty). Options: (a) you relay feedback after the phone test, (b) I add a token-guarded read-only GET /api/admin/feedback using SOMM_TOKEN and deploy. Recommend (a) until real testers exist.
 
 ## Run Log
+- 2026-11-15 13:05 — Android UI pass 1 (owner feedback): fixed Vera chat layout, tap targets, tiny labels; verified at 360/412, tests 27/27, pushed.
 - 2026-11-15 10:05 — No new work: DECISIONS.md unchanged, Today's Goals say no cycles; Q-PR002-007/008 still open, waiting on owner phone test.
 - 2026-11-15 03:05 — No new work: DECISIONS.md unchanged, Q-PR002-007/008 still open; waiting on owner phone test.
 - 2026-11-14 20:05 — No new work: DECISIONS.md unchanged, Q-PR002-007/008 still open; waiting on owner phone test.

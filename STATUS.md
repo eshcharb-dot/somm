@@ -5,10 +5,10 @@ _Maintained by the Conductor. Agents update this every cycle._
 **Phase:** Post-build polish / awaiting real-device user test (12+ polish rounds done; latest commit "Match the Tonight greeting's question to the time of day")   **Tracker status:** Review
 
 ## Today's Goals
-_Set by the Conductor 2026-11-15 08:48._
-- No cycles unless DECISIONS.md changes. Nothing deployed since 11-10; no Pages/smoke re-checks.
-- If Q-PR002-008 = (b): build token-guarded GET /api/admin/feedback (SOMM_TOKEN, no PII in logs), tests, Vercel CLI deploy, read KV once, start triage per docs/FEEDBACK-TRIAGE.md.
-- If phone-test feedback is relayed: triage via FEEDBACK-TRIAGE.md, fix the top 1-2 items, re-run prompt-test --live + frontend tests, push.
+_Set by the Conductor 2026-11-16 09:21._
+- Android passes 1-3 are live; the owner re-test is the gate (Conductor relays the link in today's brief). No Pages re-checks.
+- One agent-doable step: dark-mode + prefers-reduced-motion check at 360x800 and 412x915 on the live app (screenshots to ~/.dev-browser/tmp/android/p4*). Fix only clear defects, run tests, push, verify live once.
+- On relayed re-test feedback: triage via docs/FEEDBACK-TRIAGE.md, fix the top 1-2 items, run frontend tests (+ prompt-test --live if prompt-related), push, verify live.
 
 ## Next Steps
 - [x] (2026-11-15) Android UI pass 1: fixed Vera tab double-padding/ragged right edge + page scroll, 44px tap targets (chips, starters, budget inputs, Find online), min 11px mono labels; 360x800 & 412x915 show 0 h-scroll, 0 small targets; tests 27/27; pushed (Pages auto-deploys). Screenshots in ~/.dev-browser/tmp/android/{before,after}-*.png; capture script output/android-capture.js.
@@ -19,7 +19,7 @@ _Set by the Conductor 2026-11-15 08:48._
 - [x] (2026-11-15) Live Pages serves pass 3 css (deploy success, diff identical). Conductor to relay https://eshcharb-dot.github.io/somm/ + screenshots ~/.dev-browser/tmp/android/{p3before,p3after}-*.png to owner for re-test.
 - [ ] Await owner Android re-test feedback; triage via docs/FEEDBACK-TRIAGE.md.
 - [x] (2026-11-15) Audited PWA Android basics: viewport-fit=cover, 10 safe-area rules, theme-color, standalone manifest, maskable icon all present; nothing to fix.
-- [ ] (optional, agent-doable) Dark-mode / prefers-reduced-motion check at 360x800 if owner reports visual issues after re-test.
+- [x] (2026-11-16) Dark/reduced-motion check 360/412: app is light-only (no dark theme; 0 h-scroll in dark emulation); added <meta color-scheme=light> to stop Chrome forced-dark, reduced-motion now stops typing dots + slows spinner; tests 27/27; pushed 69e9764, live verified. Screenshots ~/.dev-browser/tmp/android/p4-*; script output/android-capture4.js.
 - [ ] (2026-11-13) Read prod KV feedback/ratings: BLOCKED, `vercel env pull` returns KV vars empty (sensitive) and the backend has no read endpoint -> Q-PR002-008.
 - [x] (2026-11-13) docs/FEEDBACK-TRIAGE.md written: feedback type -> ai.js section / file -> re-test command (frontend tests 27/27).
 - [x] (2026-11-10) Precise one-question check (sentence-final ? in prose only, --samples=N); live 3x/mode: tonight [1,1,1], store [2,1,1], restaurant [1,0,1], chat [3,1,2]. Store fails 1/3, restaurant 0/3 -> below the 2-of-3 bar, prompt FROZEN until owner phone test (chat mode 2/3 over, not in scope; revisit in triage).
@@ -66,6 +66,7 @@ _Set by the Conductor 2026-11-15 08:48._
 - [x] Q-PR002-008 (low): Agents can't read prod KV feedback (Vercel sensitive env vars pull empty). Options: (a) you relay feedback after the phone test, (b) I add a token-guarded read-only GET /api/admin/feedback using SOMM_TOKEN and deploy. Recommend (a) until real testers exist.
 
 ## Run Log
+- 2026-11-16 11:05 — Dark-mode/reduced-motion check done: color-scheme light meta + reduced-motion for typing dots/spinner; pushed 69e9764, live verified; still waiting on owner Android re-test.
 - 2026-11-16 04:05 — No new work: DECISIONS.md unchanged since 11-15 12:42; waiting on owner Android re-test feedback.
 - 2026-11-15 21:05 — No new work: DECISIONS.md unchanged since 12:42; audited PWA/safe-area basics (all fine); waiting on owner Android re-test feedback.
 - 2026-11-15 14:05 — No new work: DECISIONS.md unchanged since 12:42; Android passes 1-3 live; waiting on owner Android re-test feedback.

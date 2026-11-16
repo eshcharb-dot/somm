@@ -195,6 +195,9 @@ select.input { appearance: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .wine-card, .dlg-card { animation: none; }
+  .typing .tdot, .typing .tdot:nth-child(n) { animation: none; opacity: .6; }
+  .sr-spinner.sr-spinner { animation-duration: 2.4s; }
+  html { scroll-behavior: auto; }
 }
 .wc-inner { background: var(--card); border: 1px solid var(--hair); }
 .wc-head {

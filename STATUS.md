@@ -66,6 +66,7 @@ _Set by the Conductor 2026-11-16 09:21._
 - [x] Q-PR002-008 (low): Agents can't read prod KV feedback (Vercel sensitive env vars pull empty). Options: (a) you relay feedback after the phone test, (b) I add a token-guarded read-only GET /api/admin/feedback using SOMM_TOKEN and deploy. Recommend (a) until real testers exist.
 
 ## Run Log
+- 2026-11-16 11:15 — No new work: DECISIONS.md unchanged (last 11-15 12:42), no relayed re-test feedback; Android passes 1-4 live; waiting on owner re-test.
 - 2026-11-16 11:05 — Dark-mode/reduced-motion check done: color-scheme light meta + reduced-motion for typing dots/spinner; pushed 69e9764, live verified; still waiting on owner Android re-test.
 - 2026-11-16 04:05 — No new work: DECISIONS.md unchanged since 11-15 12:42; waiting on owner Android re-test feedback.
 - 2026-11-15 21:05 — No new work: DECISIONS.md unchanged since 12:42; audited PWA/safe-area basics (all fine); waiting on owner Android re-test feedback.

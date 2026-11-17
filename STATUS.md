@@ -66,6 +66,7 @@ _Set by the Conductor 2026-11-16 09:21._
 - [x] Q-PR002-008 (low): Agents can't read prod KV feedback (Vercel sensitive env vars pull empty). Options: (a) you relay feedback after the phone test, (b) I add a token-guarded read-only GET /api/admin/feedback using SOMM_TOKEN and deploy. Recommend (a) until real testers exist.
 
 ## Run Log
+- 2026-11-17 02:05 — No new work: DECISIONS.md unchanged (last 11-15 12:42), no relayed re-test feedback; Android passes 1-4 live; waiting on owner re-test.
 - 2026-11-16 19:05 — No new work: DECISIONS.md unchanged (last 11-15 12:42), no relayed re-test feedback; Android passes 1-4 live; waiting on owner re-test.
 - 2026-11-16 12:05 — No new work: DECISIONS.md unchanged (last 11-15 12:42), no relayed re-test feedback; Today's Goals done; waiting on owner Android re-test.
 - 2026-11-16 11:15 — No new work: DECISIONS.md unchanged (last 11-15 12:42), no relayed re-test feedback; Android passes 1-4 live; waiting on owner re-test.
@@ -89,4 +90,3 @@ _Set by the Conductor 2026-11-16 09:21._
 - 2026-11-13 11:05 — Wrote docs/FEEDBACK-TRIAGE.md; KV feedback unreadable by agent (env pull returns empty secrets) -> Q-PR002-008.
 - 2026-11-13 04:05 — No new work: prod smoke 4/4 and Pages 200 re-verified; only owner phone test (and Q-PR002-007) remain.
 - 2026-11-12 21:32 — No new work: prod smoke 4/4 and Pages 200 re-verified; only owner phone test (and Q-PR002-007) remain.
-- 2026-11-12 11:09 — No new work: prod smoke 4/4 and Pages 200 re-verified; only owner phone test (and Q-PR002-007) remain.

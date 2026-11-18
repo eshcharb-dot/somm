@@ -5,12 +5,13 @@ _Maintained by the Conductor. Agents update this every cycle._
 **Phase:** Post-build polish / awaiting real-device user test (12+ polish rounds done; latest commit "Match the Tonight greeting's question to the time of day")   **Tracker status:** Review
 
 ## Today's Goals
-_Set by the Conductor 2026-11-17 07:00._
-- The owner's re-test is the gate (no feedback since passes 1-4). Make it a 2-minute job: write docs/ANDROID-RETEST.md (live link, the 5 things that changed with before/after screenshot paths from ~/.dev-browser/tmp/android/, and a 3-line reply template: "better / still bad at <screen> / new issue").
-- On relayed feedback: triage via docs/FEEDBACK-TRIAGE.md, fix the top 1-2 items, run tests, push, verify live once.
-- No idle cycles otherwise. Don't log empty checks.
+_Set by the Conductor 2026-11-18 07:00._
+- Re-test sheet docs/ANDROID-RETEST.md is ready; the Conductor relays it today. The owner's re-test is the gate.
+- One cycle: confirm the hourly Scheduled Health Check (re-enabled 11-15) has been green over the last 24h (`gh run list`), and Pages is 200. If a run failed, root-cause it and fix only clear breakages.
+- On relayed feedback: triage via docs/FEEDBACK-TRIAGE.md, fix the top 1-2 items, run tests, push, verify live once. Otherwise no cycles; don't log empty checks.
 
 ## Next Steps
+- [x] (2026-11-18) Scheduled Health Check: 10/10 runs green since re-enable (last 2026-11-18 03:24Z); Pages 200.
 - [x] (2026-11-17) docs/ANDROID-RETEST.md written: link + 5 changes + before/after paths + 3-line reply template. Conductor to relay to owner.
 - [x] (2026-11-15) Android UI pass 1: fixed Vera tab double-padding/ragged right edge + page scroll, 44px tap targets (chips, starters, budget inputs, Find online), min 11px mono labels; 360x800 & 412x915 show 0 h-scroll, 0 small targets; tests 27/27; pushed (Pages auto-deploys). Screenshots in ~/.dev-browser/tmp/android/{before,after}-*.png; capture script output/android-capture.js.
 - [x] (2026-11-15) Live Pages verified: HTTP 200, live css/app.css byte-identical to pushed src. Owner re-test + before/after screenshots (~/.dev-browser/tmp/android/{before,after}-*.png) to be relayed by owner/Conductor.
@@ -67,6 +68,7 @@ _Set by the Conductor 2026-11-17 07:00._
 - [x] Q-PR002-008 (low): Agents can't read prod KV feedback (Vercel sensitive env vars pull empty). Options: (a) you relay feedback after the phone test, (b) I add a token-guarded read-only GET /api/admin/feedback using SOMM_TOKEN and deploy. Recommend (a) until real testers exist.
 
 ## Run Log
+- 2026-11-18 07:05 — Health check green (10/10 since 11-15, last 24h all success), Pages 200; waiting on owner Android re-test.
 - 2026-11-17 09:05 — Wrote docs/ANDROID-RETEST.md (link, 5 changes with screenshot paths, reply template); Pages 200; waiting on owner re-test.
 - 2026-11-17 02:05 — No new work: DECISIONS.md unchanged (last 11-15 12:42), no relayed re-test feedback; Android passes 1-4 live; waiting on owner re-test.
 - 2026-11-16 19:05 — No new work: DECISIONS.md unchanged (last 11-15 12:42), no relayed re-test feedback; Android passes 1-4 live; waiting on owner re-test.

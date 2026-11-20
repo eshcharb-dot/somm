@@ -5,10 +5,10 @@ _Maintained by the Conductor. Agents update this every cycle._
 **Phase:** Post-build polish / awaiting real-device user test (12+ polish rounds done; latest commit "Match the Tonight greeting's question to the time of day")   **Tracker status:** Review
 
 ## Today's Goals
-_Set by the Conductor 2026-11-18 07:00._
-- Re-test sheet docs/ANDROID-RETEST.md is ready; the Conductor relays it today. The owner's re-test is the gate.
-- One cycle: confirm the hourly Scheduled Health Check (re-enabled 11-15) has been green over the last 24h (`gh run list`), and Pages is 200. If a run failed, root-cause it and fix only clear breakages.
-- On relayed feedback: triage via docs/FEEDBACK-TRIAGE.md, fix the top 1-2 items, run tests, push, verify live once. Otherwise no cycles; don't log empty checks.
+_Set by the Conductor 2026-11-20 07:00._
+- Day 5 waiting on the owner's Android re-test (docs/ANDROID-RETEST.md). No polish passes until feedback arrives.
+- One cycle only (first cycle of the day): check the Scheduled Health Check runs since 11-18 03:24Z and Pages 200, and log ONE line with the run count (11-19 had no log line, so the 48h are unrecorded). If a run failed, root-cause it and fix only clear breakages.
+- On relayed feedback: triage via docs/FEEDBACK-TRIAGE.md, fix the top 1-2 items, run tests, push, verify live once. Every other cycle: exit with no log line.
 
 ## Next Steps
 - [x] (2026-11-18) Scheduled Health Check: 10/10 runs green since re-enable (last 2026-11-18 03:24Z); Pages 200.
@@ -68,6 +68,7 @@ _Set by the Conductor 2026-11-18 07:00._
 - [x] Q-PR002-008 (low): Agents can't read prod KV feedback (Vercel sensitive env vars pull empty). Options: (a) you relay feedback after the phone test, (b) I add a token-guarded read-only GET /api/admin/feedback using SOMM_TOKEN and deploy. Recommend (a) until real testers exist.
 
 ## Run Log
+- 2026-11-20 15:31 — Health check: 8 runs since 11-18 03:24Z, all success (latest 11-20 11:02Z; GitHub schedule is sparse, fewer than hourly), Pages 200; waiting on owner Android re-test.
 - 2026-11-18 07:05 — Health check green (10/10 since 11-15, last 24h all success), Pages 200; waiting on owner Android re-test.
 - 2026-11-17 09:05 — Wrote docs/ANDROID-RETEST.md (link, 5 changes with screenshot paths, reply template); Pages 200; waiting on owner re-test.
 - 2026-11-17 02:05 — No new work: DECISIONS.md unchanged (last 11-15 12:42), no relayed re-test feedback; Android passes 1-4 live; waiting on owner re-test.
